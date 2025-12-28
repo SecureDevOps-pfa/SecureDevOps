@@ -143,6 +143,24 @@ Each job is allocated default CPU and memory resources to ensure isolation and f
 - Each stage is implemented as a standalone `.sh` script.
 - Backend simply calls `build.sh`, `test.sh`, etc., without custom logic per framework.
 - good for modularity, reusability, and future extensibility.
+- we would have a project structure similar to :
+
+```   
+├── 📁 pipelines/
+│   ├── 📁spring/
+│   │   ├── build.sh
+│   │   ├── test.sh
+│   │   ├── package.sh
+│   │   ├── run-smoke.sh
+│   │   └── dast.sh
+│   └── 📁angular/
+│       ├── build.sh
+│       ├── test.sh
+│       ├── package.sh
+│       ├── run-smoke.sh
+│       └── dast.sh
+
+```
 
 ### Canonical CI/CD Stages (for full CI) after project validation
 
@@ -162,41 +180,74 @@ Each job is allocated default CPU and memory resources to ensure isolation and f
 
 # 6. Phase 4 — Pipeline Execution & Isolation
 
-- Containerized execution model
-- Runner-based approach (fat runners)
-- Resource limits & network isolation
-- DAST / runtime testing isolation
-    
-    ---
-    
+### Containerized Execution Model
 
-# 8. Phase 5 — Results Collection & Reporting
+- Each job runs in an **isolated Docker container**, ensuring security and reproducibility.
+- Prebuilt images with all necessary dependencies are used:
+    - Project code is mounted read-only
+    - Pipeline scripts are executed inside this environment
+- Isolation protects the host machine from untrusted inputs and runtime vulnerabilities.
 
-- What outputs are collected
-- Normalization philosophy
-- Final report generation (JSON → frontend)
+### Runner-Based Approach
 
+- **Fat runners**: prebuilt Docker images containing all required runtimes and tools.
+    - Example: Java 17 + Maven 3.9 runner
+    - Fast for execution, no rebuild per job
+    - Trade-off: larger storage footprint
+- Alternative: dynamic runner templates per user request (different tool versions)
+    - Slower due to per-job image builds
+    - More flexible, less storage , more time to wait for the end user .
+- **Current project**: we willuse fat runners to limit the amount of supported project types and to have faster requests so we can better test and debug the processes .
+
+### Temporary Workspace (per job)
+
+- A unique workspace is created for each job, containing:
+
+```
+├── 📁 workdir/<job-id>/
+│   ├── 📁 project/        # user source code (read-only)
+│   ├── 📁 pipelines/      # framework pipeline scripts
+│   │   └── 📁 spring/
+│   │       ├── build.sh
+│   │       ├── test.sh
+│   │       ├── package.sh
+│   │       ├── run-smoke.sh
+│   │       └── dast.sh
+│   ├── 📁 reports/        # normalized outputs (writable)
+│   │   ├── 📁 build/
+│   │   ├── 📁 sast/
+│   │   ├── 📁 dast/
+│   │   └── 📝 meta.json
+│   └── 📁 metadata/
+│       └── 📝 project.json # generated after validation
+```
+
+- **Mounts inside the runner**:
+    - `project/` → read-only source code for builds tests …
+    - `reports/` → writable outputs for normalization and reporting
+    - `metadata/` → guides script selection and execution
+
+### Network & DAST Isolation
+
+- Each job uses a **private Docker network** to prevent exposure to host or other jobs
+- DAST workflow:
+    - Runner container runs the project
+    - OWASP ZAP container connects inside the same network to perform dynamic scanning
+- Future option: run the entire workspace on a **Raspberry Pi** for extra security isolation
+
+### Example Workflow (Java 17 + Maven 3.9)
+
+
+
+```bash
+docker run --rm \
+  -v /workdir/job-001/project:/app:ro \
+  -v /workdir/job-001/reports:/reports \
+  -v /workdir/job-001/pipelines:/pipelines \
+  --network job-001-net \
+  runner-java17-maven39 \
+  bash -c "/pipelines/spring/build.sh && /pipelines/spring/test.sh"
+```
+- Outputs are collected, normalized, and saved in `/reports/`
+- Workspace is deleted after job completion, freeing resources
 ---
-
-# 9. Frontend Interaction & Visualization
-
-- How results are presented
-- Developer-oriented UX philosophy
-- No UI implementation details
-
----
-
-# 10. Security Model & Limitations
-
-- Isolation guarantees
-- Hard vs soft failures
-- Cleanup strategy
-- Known limitations (important for credibility)
-
----
-
-# 11. Scalability & Future Extensions
-
-- Parallel job limits
-- Distributed execution idea (Raspberry Pi workers)
-- Framework extensibility
