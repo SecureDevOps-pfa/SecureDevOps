@@ -1,42 +1,46 @@
 # backend/app.py
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body
+from pydantic import BaseModel
 
 from services.upload_service import handle_zip_upload
 from services.github_service import clone_github_repo
 
-app = Flask(__name__)
+app = FastAPI(
+    title="Secure DevSecOps Pipeline",
+    version="1.0.0"
+)
 
-@app.route("/api/jobs", methods=["POST"])
-def create_job():
+class GitHubRequest(BaseModel):
+    github_url: str
 
-    # Case 1: ZIP upload
-    if "project_zip" in request.files:
-        file = request.files["project_zip"]
 
-        if not file.filename.lower().endswith(".zip"):
-            return jsonify({"error": "Only ZIP files are allowed"}), 400
+# ---------- Endpoints ----------
 
-        try:
-            metadata = handle_zip_upload(file)
-            return jsonify(metadata), 201
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 400
+@app.post("/api/jobs/upload", status_code=201)
+async def create_job_from_zip(
+    project_zip: UploadFile = File(...)
+):
+    if not project_zip.filename.lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only ZIP files are allowed"
+        )
 
-    # Case 2: GitHub repo (JSON body)
-    if request.is_json:
-        data = request.get_json()
-        github_url = data.get("github_url")
+    try:
+        return handle_zip_upload(project_zip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-        if github_url:
-            try:
-                metadata = clone_github_repo(github_url)
-                return jsonify(metadata), 201
-            except ValueError as e:
-                return jsonify({"error": str(e)}), 400
 
-    return jsonify({
-        "error": "Provide either project_zip (file) or github_url (JSON)"
-    }), 400
+@app.post("/api/jobs/github", status_code=201)
+async def create_job_from_github(
+    payload: GitHubRequest
+):
+    try:
+        return clone_github_repo(payload.github_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-if __name__ == "__main__":
-    app.run(debug=True)
+
+
+#http://127.0.0.1:8000/docs

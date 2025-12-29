@@ -1,3 +1,4 @@
+from fastapi import UploadFile
 import io
 import json
 import time
@@ -20,11 +21,10 @@ from utils.zip_safety import (
 
 def generate_job_id() -> str:
     WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
-    existing = sorted([p for p in WORKSPACES_DIR.glob("job-*") if p.is_dir()])
+    existing = sorted(p for p in WORKSPACES_DIR.glob("job-*") if p.is_dir())
     return f"job-{len(existing) + 1:03d}"
 
-
-def handle_zip_upload(file_storage):
+def handle_zip_upload(file: UploadFile):
     """
     Securely processes an uploaded ZIP file by validating size and format,
     creating an isolated job directory, and safely extracting contents.
@@ -34,7 +34,7 @@ def handle_zip_upload(file_storage):
     escape attacks. Writes job metadata on success and fails fast on any
     validation error.
     """
-    raw = file_storage.read()
+    raw = file.file.read()
 
     if len(raw) > MAX_UPLOAD_BYTES:
         raise ValueError("Uploaded file exceeds maximum allowed size")
@@ -45,8 +45,8 @@ def handle_zip_upload(file_storage):
     job_id = generate_job_id()
     job_dir = WORKSPACES_DIR / job_id
     source_dir = job_dir / "source"
-
     source_dir.mkdir(parents=True, exist_ok=False)
+
     (job_dir / "upload.zip").write_bytes(raw)
 
     total_size = 0
@@ -85,7 +85,7 @@ def handle_zip_upload(file_storage):
         "current_stage": "input_handling",
         "input": {
             "type": "zip",
-            "original_filename": file_storage.filename,
+            "original_filename": file.filename,
             "uploaded_bytes": len(raw),
             "extracted_files": file_count,
             "extracted_bytes": total_size,
