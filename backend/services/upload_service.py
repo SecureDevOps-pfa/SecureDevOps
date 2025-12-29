@@ -5,7 +5,7 @@ import zipfile
 from pathlib import Path
 
 from config import (
-    JOBS_DIR,
+    WORKSPACES_DIR,
     MAX_UPLOAD_BYTES,
     MAX_FILES,
     MAX_UNCOMPRESSED_BYTES,
@@ -19,8 +19,8 @@ from utils.zip_safety import (
 )
 
 def generate_job_id() -> str:
-    JOBS_DIR.mkdir(parents=True, exist_ok=True)
-    existing = sorted([p for p in JOBS_DIR.glob("job-*") if p.is_dir()])
+    WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
+    existing = sorted([p for p in WORKSPACES_DIR.glob("job-*") if p.is_dir()])
     return f"job-{len(existing) + 1:03d}"
 
 
@@ -43,7 +43,7 @@ def handle_zip_upload(file_storage):
         raise ValueError("File is not a valid ZIP archive")
 
     job_id = generate_job_id()
-    job_dir = JOBS_DIR / job_id
+    job_dir = WORKSPACES_DIR / job_id
     source_dir = job_dir / "source"
 
     source_dir.mkdir(parents=True, exist_ok=False)
