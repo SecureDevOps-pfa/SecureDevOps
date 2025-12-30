@@ -1,0 +1,22 @@
+{
+  "required_paths": [
+    "pom.xml",
+    "src/main/java"
+  ],
+  "required_files": [
+    {
+      "pattern": "**/*.java",
+      "min_count": 1
+    }
+  ],
+  "semantic_checks": [
+    {
+      "type": "contains_text",
+      "value": "@SpringBootApplication",
+      "exactly_one": true
+    }
+  ],
+  "optional_paths": [
+    "src/test/java"
+  ]
+}
