@@ -20,6 +20,8 @@ from utils.zip_safety import (
     reject_symlink,
 )
 
+from utils.content_safety import reject_dangerous_file
+
 def generate_job_id() -> str:
     WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
     existing = sorted(p for p in WORKSPACES_DIR.glob("job-*") if p.is_dir())
@@ -77,6 +79,7 @@ def handle_zip_upload(file: UploadFile):
                 file_count += 1
 
                 target_path = safe_extract_path(source_dir, entry.filename)
+                reject_dangerous_file(target_path)
                 target_path.parent.mkdir(parents=True, exist_ok=True)
 
                 with zf.open(entry) as src, open(target_path, "wb") as dst:
