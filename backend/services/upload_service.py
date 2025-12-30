@@ -1,3 +1,4 @@
+import shutil
 from fastapi import UploadFile
 import io
 import json
@@ -45,56 +46,64 @@ def handle_zip_upload(file: UploadFile):
     job_id = generate_job_id()
     job_dir = WORKSPACES_DIR / job_id
     source_dir = job_dir / "source"
-    source_dir.mkdir(parents=True, exist_ok=False)
 
-    (job_dir / "upload.zip").write_bytes(raw)
+    try : 
+        source_dir.mkdir(parents=True, exist_ok=False)
 
-    total_size = 0
-    file_count = 0
+        (job_dir / "upload.zip").write_bytes(raw)
 
-    with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-        entries = zf.infolist()
+        total_size = 0
+        file_count = 0
 
-        if len(entries) > MAX_FILES:
-            raise ValueError("Too many files in ZIP archive")
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            entries = zf.infolist()
 
-        for entry in entries:
-            if entry.filename.endswith("/"):
-                continue
+            if len(entries) > MAX_FILES:
+                raise ValueError("Too many files in ZIP archive")
 
-            if path_depth(entry.filename) > MAX_DEPTH:
-                raise ValueError("ZIP directory depth exceeded")
+            for entry in entries:
+                if entry.filename.endswith("/"):
+                    continue
 
-            reject_symlink(entry)
+                if path_depth(entry.filename) > MAX_DEPTH:
+                    raise ValueError("ZIP directory depth exceeded")
 
-            total_size += entry.file_size
-            if total_size > MAX_UNCOMPRESSED_BYTES:
-                raise ValueError("ZIP extraction size limit exceeded")
+                reject_symlink(entry)
 
-            file_count += 1
+                total_size += entry.file_size
+                if total_size > MAX_UNCOMPRESSED_BYTES:
+                    raise ValueError("ZIP extraction size limit exceeded")
 
-            target_path = safe_extract_path(source_dir, entry.filename)
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+                file_count += 1
 
-            with zf.open(entry) as src, open(target_path, "wb") as dst:
-                dst.write(src.read())
+                target_path = safe_extract_path(source_dir, entry.filename)
+                target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    metadata = {
-        "job_id": job_id,
-        "status": "UPLOADED",
-        "current_stage": "input_handling",
-        "input": {
-            "type": "zip",
-            "original_filename": file.filename,
-            "uploaded_bytes": len(raw),
-            "extracted_files": file_count,
-            "extracted_bytes": total_size,
-        },
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    }
+                with zf.open(entry) as src, open(target_path, "wb") as dst:
+                    dst.write(src.read())
 
-    (job_dir / "metadata.json").write_text(
-        json.dumps(metadata, indent=2), encoding="utf-8"
-    )
+        metadata = {
+            "job_id": job_id,
+            "status": "UPLOADED",
+            "current_stage": "input_handling",
+            "input": {
+                "type": "zip",
+                "original_filename": file.filename,
+                "uploaded_bytes": len(raw),
+                "extracted_files": file_count,
+                "extracted_bytes": total_size,
+            },
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
 
-    return metadata
+        (job_dir / "metadata.json").write_text(
+            json.dumps(metadata, indent=2), encoding="utf-8"
+        )
+
+        return metadata
+    
+    except Exception:
+        # remove workspace on failure
+        if job_dir.exists():
+            shutil.rmtree(job_dir, ignore_errors=True)
+        raise

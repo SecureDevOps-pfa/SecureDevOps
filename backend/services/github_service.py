@@ -1,4 +1,5 @@
 import json
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -26,23 +27,24 @@ def clone_github_repo(github_url: str):
     job_id = generate_job_id()
     job_dir = WORKSPACES_DIR / job_id
     source_dir = job_dir / "source"
-    source_dir.mkdir(parents=True, exist_ok=False)
-
-    # Safe clone:
-    # - shallow clone
-    # - no submodules
-    # - no tags
-    cmd = [
-        "git",
-        "clone",
-        "--depth", str(GIT_MAX_DEPTH),
-        "--no-tags",
-        "--single-branch",
-        github_url,
-        str(source_dir)
-    ]
 
     try:
+        source_dir.mkdir(parents=True, exist_ok=False)
+
+        # Safe clone:
+        # - shallow clone
+        # - no submodules
+        # - no tags
+        cmd = [
+            "git",
+            "clone",
+            "--depth", str(GIT_MAX_DEPTH),
+            "--no-tags",
+            "--single-branch",
+            github_url,
+            str(source_dir)
+        ]
+
         subprocess.run(
             cmd,
             timeout=GIT_CLONE_TIMEOUT,
@@ -50,29 +52,28 @@ def clone_github_repo(github_url: str):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-    except subprocess.TimeoutExpired:
-        raise ValueError("Git clone timed out")
-    except subprocess.CalledProcessError:
-        raise ValueError("Failed to clone GitHub repository")
 
-    # Remove .git directory (important!)
-    git_dir = source_dir / ".git"
-    if git_dir.exists():
-        subprocess.run(["rm", "-rf", str(git_dir)])
+        git_dir = source_dir / ".git"
+        if git_dir.exists():
+            subprocess.run(["rm", "-rf", str(git_dir)])
+        
+        metadata = {
+            "job_id": job_id,
+            "status": "ACCEPTED",
+            "current_stage": "input_handling",
+            "input": {
+                "type": "github",
+                "repository": github_url
+            },
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        }
 
-    metadata = {
-        "job_id": job_id,
-        "status": "UPLOADED",
-        "current_stage": "input_handling",
-        "input": {
-            "type": "github",
-            "repository": github_url
-        },
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    }
-
-    (job_dir / "metadata.json").write_text(
-        json.dumps(metadata, indent=2), encoding="utf-8"
-    )
-
-    return metadata
+        (job_dir / "metadata.json").write_text(
+            json.dumps(metadata, indent=2), encoding="utf-8"
+        )
+        return metadata
+    
+    except Exception:
+        if job_dir.exists():
+            shutil.rmtree(job_dir, ignore_errors=True)
+        raise
