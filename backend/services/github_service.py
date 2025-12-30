@@ -5,7 +5,14 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
+from utils.repo_safety import scan_repo
 from config import WORKSPACES_DIR, GIT_CLONE_TIMEOUT, GIT_MAX_DEPTH
+from config import (
+    WORKSPACES_DIR,
+    MAX_FILES,
+    MAX_UNCOMPRESSED_BYTES,
+    MAX_DEPTH,
+)
 
 def is_valid_github_url(url: str) -> bool:
     parsed = urlparse(url)
@@ -57,6 +64,13 @@ def clone_github_repo(github_url: str):
         if git_dir.exists():
             subprocess.run(["rm", "-rf", str(git_dir)])
         
+        scan_repo(
+            source_dir,
+            max_files=MAX_FILES,
+            max_bytes=MAX_UNCOMPRESSED_BYTES,
+            max_depth=MAX_DEPTH,
+        )
+
         metadata = {
             "job_id": job_id,
             "status": "ACCEPTED",
