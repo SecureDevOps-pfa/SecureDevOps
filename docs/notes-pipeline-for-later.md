@@ -12,5 +12,21 @@ for the current iteration ill do many things manually to test the pipelines and 
 - all dockerfiles/runners would use non root users with the same id 
 
 
+commands to automate : 
+- moving the workspace permission to the runner user 
+```bash
+sudo chown -R 10001:10001 workspaces-test/job-test
+sudo chmod -R u+rx workspaces-test/job-test
+```
+running the runner (using the docker image ) , will be slightly changed when adding tags to the docker image 
+```bash 
+docker run --rm -it \
+  -u 10001:10001 \
+  -v $(pwd)/workspaces-test/job-test/app:/app:ro \
+  -v $(pwd)/workspaces-test/job-test/pipelines:/pipelines:ro \
+  -v $(pwd)/workspaces-test/job-test/reports:/reports:rw \
+  abderrahmane03/pipelinex:java17-mvn3.9.12
+```
+
 ### General app 
 - opnce the project is tested and approved rename its folder to app/ and remove unecessary files (optiona , such as readme mvnw ... )
