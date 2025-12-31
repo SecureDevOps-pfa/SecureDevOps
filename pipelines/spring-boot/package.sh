@@ -4,18 +4,19 @@ set -Eeuo pipefail
 STAGE="package"
 REPORT_DIR="/reports/${STAGE}"
 REPORT_FILE="${REPORT_DIR}/result.json"
+LOG_FILE="${REPORT_DIR}/${STAGE}.log"
 
 mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-if mvn -f /app/pom.xml -DskipTests package >/dev/null 2>&1; then
+if mvn -f /app/pom.xml clean package -DskipTests  >"$LOG_FILE" 2>&1; then
   STATUS="SUCCESS"
-  MESSAGE="JAR packaged successfully"
+  MESSAGE="${STAGE} stage succeeded"
   EXIT_CODE=0
 else
   STATUS="FAILED"
-  MESSAGE="Packaging failed"
+  MESSAGE="${STAGE} stage failed , see logs at ${LOG_FILE} "
   EXIT_CODE=1
 fi
 
@@ -26,11 +27,8 @@ cat > "${REPORT_FILE}" <<EOF
 {
   "stage": "${STAGE}",
   "status": "${STATUS}",
-  "timestamp": "$(date -Iseconds)",
   "duration_ms": ${DURATION},
-  "details": {
-    "message": "${MESSAGE}"
-  }
+  "message": "${MESSAGE}"
 }
 EOF
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-STAGE="smoke"
+STAGE="smoke test"
 REPORT_DIR="/reports/${STAGE}"
 REPORT_FILE="${REPORT_DIR}/result.json"
+LOG_FILE="${REPORT_DIR}/${STAGE}.log"
 
 mkdir -p "${REPORT_DIR}"
 
@@ -27,13 +28,13 @@ EOF
 fi
 
 # Start app in background
-java -jar "${JAR_FILE}" >/dev/null 2>&1 &
+java -jar "${JAR_FILE}" >"$LOG_FILE" 2>&1 &
 APP_PID=$!
 
-# Wait for app to boot (max 20s)
+# Wait for app to boot (max 30s)
 READY=false
 for i in {1..30}; do
-  if curl -fs http://localhost:8080/actuator/health >/dev/null 2>&1; then
+  if curl -fs http://localhost:8080/actuator/health >"$LOG_FILE" 2>&1; then
     READY=true
     break
   fi
@@ -53,7 +54,7 @@ if [[ "${READY}" == "true" ]]; then
   EXIT_CODE=0
 else
   STATUS="FAILED"
-  MESSAGE="Health endpoint not reachable"
+  MESSAGE="${STAGE} stage failed , see logs at ${LOG_FILE} "
   EXIT_CODE=1
 fi
 
@@ -61,11 +62,8 @@ cat > "${REPORT_FILE}" <<EOF
 {
   "stage": "${STAGE}",
   "status": "${STATUS}",
-  "timestamp": "$(date -Iseconds)",
   "duration_ms": ${DURATION},
-  "details": {
-    "message": "${MESSAGE}"
-  }
+  "message": "${MESSAGE}"
 }
 EOF
 
