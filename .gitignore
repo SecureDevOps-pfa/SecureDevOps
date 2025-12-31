@@ -20,3 +20,7 @@ outputs/
 
 # Secrets
 .env
+
+
+#the temporary testing folder 
+workspaces-test/job-test/app
