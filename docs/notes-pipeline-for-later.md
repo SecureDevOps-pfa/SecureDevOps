@@ -17,7 +17,7 @@ commands to automate :
 ```bash
 sudo chown -R 10001:10001 workspaces-test/job-test
 sudo chmod -R u+rwx workspaces-test/job-test (or chmod 700 job-test for better isolation , for the future)
-chmod +x workspaces-test/job-test/pipelines/*.sh
+sudo chmod +x workspaces-test/job-test/pipelines/*.sh
 ```
 running the runner (using the docker image ) , will be slightly changed when adding tags to the docker image 
 ```bash 
@@ -28,6 +28,8 @@ docker run --rm -it \
   -v $PWD/workspaces-test/job-test/reports:/home/runner/reports:rw \
   -w /home/runner \
   abderrahmane03/pipelinex:java17-mvn3.9.12-latest
+#one liner
+docker run --rm -it   -u 10001:10001   -v $PWD/workspace-runner/app:/home/runner/app:rw   -v $PWD/workspace-runner/pipelines:/home/runner/pipelines:ro   -v $PWD/workspace-runner/reports:/home/runner/reports:rw   -w /home/runner   abderrahmane03/pipelinex:java17-mvn3.9.12-latest
 ```
 
 ```bash
@@ -55,3 +57,11 @@ if mvn -f ../app/pom.xml -DskipTests clean compile \
 | `2>&1`    | stderr included                    |
 | exit code | Maven returns correct status       |
 
+
+
+- for debugging permissions : 
+```bash
+ls -ld $PWD
+ls -ld workspace-runner
+ls -ld workspace-runner/reports
+```
