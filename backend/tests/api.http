@@ -1,0 +1,56 @@
+### Create job from ZIP upload
+POST http://127.0.0.1:8000/api/jobs/upload
+Content-Type: multipart/form-data; boundary=BOUNDARY
+
+--BOUNDARY
+Content-Disposition: form-data; name="metadata"
+
+{
+  "stack": {
+    "language": "java",
+    "framework": "spring-boot",
+    "build_tool": "maven"
+  },
+  "versions": {
+    "java": "17",
+    "build_tool": "3.9"
+  },
+  "pipeline": {
+    "run_build": true,
+    "run_unit_tests": true,
+    "run_sast": true,
+    "run_sca": true,
+    "run_secret_scan": true
+  }
+}
+--BOUNDARY
+Content-Disposition: form-data; name="project_zip"; filename="math-lab-main.zip"
+Content-Type: application/zip
+
+< ./fixtures/sample-project.zip
+--BOUNDARY--
+
+
+### Create job from GitHub repository
+POST http://127.0.0.1:8000/api/jobs/github
+Content-Type: application/json
+
+{
+  "github_url": "https://github.com/ABDERRAHMANE2303/math-lab.git",
+  "stack": {
+    "language": "java",
+    "framework": "spring-boot",
+    "build_tool": "maven"
+  },
+  "versions": {
+    "java": "17",
+    "build_tool": "3.9"
+  },
+  "pipeline": {
+    "run_build": true,
+    "run_unit_tests": true,
+    "run_sast": true,
+    "run_sca": true,
+    "run_secret_scan": true
+  }
+}
