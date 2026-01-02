@@ -24,3 +24,5 @@ outputs/
 
 #the temporary testing folder 
 workspaces-test/job-test
+workspace-directly/
+workspace-runner/

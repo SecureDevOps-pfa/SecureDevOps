@@ -37,3 +37,21 @@ docker push abderrahmane03/pipelinex:java17-mvn3.9.12-latest
 
 ### General app 
 - opnce the project is tested and approved rename its folder to app/ and remove unecessary files (optiona , such as readme mvnw ... )
+
+
+
+### useful for later documentation 
+- to display logs clearly for maven use : 
+```bash
+if mvn -f ../app/pom.xml -DskipTests clean compile \
+     -B -ntp \
+     >"$LOG_FILE" 2>&1; then
+```
+| Flag      | Why                                |
+| --------- | ---------------------------------- |
+| `-B`      | Batch mode → no colors, no prompts |
+| `-ntp`    | No transfer progress spam          |
+| `>`       | All stdout to file                 |
+| `2>&1`    | stderr included                    |
+| exit code | Maven returns correct status       |
+
