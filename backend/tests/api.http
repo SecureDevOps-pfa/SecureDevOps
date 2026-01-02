@@ -27,7 +27,7 @@ Content-Disposition: form-data; name="metadata"
 Content-Disposition: form-data; name="project_zip"; filename="math-lab-main.zip"
 Content-Type: application/zip
 
-< ./fixtures/sample-project.zip
+< ./fixtures/math-lab-main.zip
 --BOUNDARY--
 
 

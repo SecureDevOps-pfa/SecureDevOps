@@ -5,7 +5,6 @@ from pathlib import Path
 from fastapi import UploadFile
 
 from config import (
-    WORKSPACES_DIR,
     MAX_UPLOAD_BYTES,
     MAX_FILES,
     MAX_UNCOMPRESSED_BYTES,
@@ -18,22 +17,16 @@ from utils.zip_safety import (
     reject_symlink,
 )
 from utils.content_safety import reject_dangerous_file
+from services.workspace_service import create_workspace, cleanup_workspace
 
-
-def _generate_job_id() -> str:
-    WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
-    existing = sorted(p for p in WORKSPACES_DIR.glob("job-*") if p.is_dir())
-    return f"job-{len(existing) + 1:03d}"
 
 def _normalize_single_root_directory(source_dir: Path):
     entries = list(source_dir.iterdir())
 
     if len(entries) == 1 and entries[0].is_dir():
         root = entries[0]
-
         for item in root.iterdir():
             shutil.move(str(item), source_dir)
-
         root.rmdir()
 
 
@@ -46,13 +39,9 @@ def handle_zip_input(file: UploadFile):
     if not is_valid_zip_signature(raw[:8]):
         raise ValueError("File is not a valid ZIP archive")
 
-    job_id = _generate_job_id()
-    job_dir = WORKSPACES_DIR / job_id
-    source_dir = job_dir / "source"
+    workspace = create_workspace()
 
     try:
-        source_dir.mkdir(parents=True, exist_ok=False)
-
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
             entries = zf.infolist()
 
@@ -74,17 +63,19 @@ def handle_zip_input(file: UploadFile):
                 if total_size > MAX_UNCOMPRESSED_BYTES:
                     raise ValueError("ZIP extraction size limit exceeded")
 
-                target_path = safe_extract_path(source_dir, entry.filename)
+                target_path = safe_extract_path(
+                    workspace.source_dir, entry.filename
+                )
+
                 reject_dangerous_file(target_path)
                 target_path.parent.mkdir(parents=True, exist_ok=True)
 
                 with zf.open(entry) as src, open(target_path, "wb") as dst:
                     dst.write(src.read())
-                    
-            _normalize_single_root_directory(source_dir)
-        return job_dir, source_dir
+
+        _normalize_single_root_directory(workspace.source_dir)
+        return workspace
 
     except Exception:
-        if job_dir.exists():
-            shutil.rmtree(job_dir, ignore_errors=True)
+        cleanup_workspace(workspace)
         raise
