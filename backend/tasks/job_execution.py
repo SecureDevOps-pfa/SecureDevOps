@@ -25,18 +25,33 @@ def execute_job(self, job_id: str):
         _update_execution_state(job_dir, "FAILED", str(exc))
         raise
 
-    finally:
-        # Cleanup Docker volume (OS-independent)
-        subprocess.run(
-            ["docker", "volume", "rm", f"reports-{job_id}"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
 
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
+
+def _update_execution_state(
+    job_dir: Path,
+    state: str,
+    error: str | None = None,
+):
+    """
+    Persist execution state for the job.
+    """
+
+    state_file = job_dir / "state.json"
+
+    payload = {
+        "state": state,
+    }
+
+    if error:
+        payload["error"] = error
+
+    state_file.write_text(
+        json.dumps(payload, indent=2),
+        encoding="utf-8",
+    )
 
 def _prepare_workspace_permissions(job_dir: Path):
 
@@ -55,9 +70,6 @@ def _prepare_workspace_permissions(job_dir: Path):
         for script in pipelines_dir.glob("*.sh"):
             script.chmod(0o755)
 
-def _docker_user_args():
-    return ["-u", "10001:10001"]
-
 def _init_reports_volume(job_id: str):
     """
     Ensure the reports volume is writable by UID 10001
@@ -73,7 +85,6 @@ def _init_reports_volume(job_id: str):
         ],
         check=True
     )
-
 
 def _run_runner_container(job_dir: Path, metadata: dict):
     """
@@ -106,6 +117,23 @@ def _run_runner_container(job_dir: Path, metadata: dict):
         ],
         check=True,
     )
+
+def _select_runner_image(metadata: dict) -> str:
+    """
+    Select Docker runner image based on stack metadata.
+    Minimal mapping for now.
+    """
+
+    stack = metadata.get("stack", {})
+
+    if stack.get("language") == "java" and stack.get("build_tool") == "maven":
+        return "abderrahmane03/pipelinex:java17-mvn3.9.12-latest"
+
+    raise RuntimeError("Unsupported stack for runner selection")
+
+
+def _docker_user_args():
+    return ["-u", "10001:10001"]
 
 def _pipeline_command(metadata: dict) -> str:
     """
@@ -143,44 +171,6 @@ def _pipeline_command(metadata: dict) -> str:
         commands.append(stage("SECRETS", f"bash {base}/secrets.sh"))
 
     return " && ".join(commands)
-
-
-def _select_runner_image(metadata: dict) -> str:
-    """
-    Select Docker runner image based on stack metadata.
-    Minimal mapping for now.
-    """
-
-    stack = metadata.get("stack", {})
-
-    if stack.get("language") == "java" and stack.get("build_tool") == "maven":
-        return "abderrahmane03/pipelinex:java17-mvn3.9.12-latest"
-
-    raise RuntimeError("Unsupported stack for runner selection")
-
-
-def _update_execution_state(
-    job_dir: Path,
-    state: str,
-    error: str | None = None,
-):
-    """
-    Persist execution state for the job.
-    """
-
-    state_file = job_dir / "state.json"
-
-    payload = {
-        "state": state,
-    }
-
-    if error:
-        payload["error"] = error
-
-    state_file.write_text(
-        json.dumps(payload, indent=2),
-        encoding="utf-8",
-    )
 
 def _resolve_pipeline_dir(metadata: dict) -> str:
     stack = metadata.get("stack", {})
