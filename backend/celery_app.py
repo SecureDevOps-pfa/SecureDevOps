@@ -1,19 +1,13 @@
 import os
-import platform
 from celery import Celery
 
 
 def get_worker_pool():
-    return os.getenv(
-        "CELERY_WORKER_POOL",
-        "solo" if platform.system() == "Windows" else "prefork",
-    )
+    return os.getenv("CELERY_WORKER_POOL", "prefork")
 
 
 def get_concurrency():
-    if platform.system() == "Windows":
-        return 1
-    return int(os.getenv("CELERY_WORKER_CONCURRENCY", "4"))
+    return int(os.getenv("CELERY_WORKER_CONCURRENCY", "1"))
 
 
 celery_app = Celery(
@@ -28,8 +22,14 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+
+    # execution model
     worker_pool=get_worker_pool(),
     worker_concurrency=get_concurrency(),
+
+    # important for long-running jobs
+    task_acks_late=True,
+    worker_prefetch_multiplier=1,
 )
 
 # auto-discover tasks
