@@ -2,6 +2,8 @@ from services.workspace_service import cleanup_workspace
 from services.zip_input_service import handle_zip_input
 from services.repo_input_service import clone_github_repository
 from services.job_admission import admit_job
+from services.pipeline_installer import install_pipelines
+from tasks.job_execution import execute_job
 
 
 class JobOrchestrator:
@@ -16,12 +18,19 @@ class JobOrchestrator:
         try:
             workspace = handle_zip_input(file)
 
-            return admit_job(
+            job_metadata = admit_job(
                 workspace=workspace,
                 stack=metadata["stack"],
                 versions=metadata.get("versions", {}),
                 pipeline=metadata["pipeline"],
             )
+            
+            framework = "spring-boot-maven"  # hardcoded for now
+            install_pipelines(workspace, framework)
+
+            execute_job.delay(workspace.job_id)
+
+            return job_metadata
 
         except Exception:
             if workspace:
@@ -34,12 +43,18 @@ class JobOrchestrator:
         try:
             workspace = clone_github_repository(github_url)
 
-            return admit_job(
+            job_metadata = admit_job(
                 workspace=workspace,
                 stack=metadata["stack"],
                 versions=metadata.get("versions", {}),
                 pipeline=metadata["pipeline"],
             )
+
+            framework = "spring-boot-maven"  # hardcoded for now
+            install_pipelines(workspace, framework)
+
+            execute_job.delay(workspace.job_id)
+            return job_metadata
 
         except Exception:
             if workspace:

@@ -25,13 +25,13 @@ def create_workspace() -> Workspace:
 
     job_dir.mkdir()
     source_dir.mkdir()
+    (job_dir / "pipelines").mkdir()
 
     return Workspace(
         job_id=job_id,
         job_dir=job_dir,
         source_dir=source_dir,
     )
-
 
 def cleanup_workspace(workspace: Workspace):
     if workspace.job_dir.exists():

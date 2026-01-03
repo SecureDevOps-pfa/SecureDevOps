@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+: "${REPORTS_DIR:?REPORTS_DIR not set}"
+: "${APP_DIR:?APP_DIR not set}"
+
 STAGE="build"
-REPORT_DIR="../reports/${STAGE}"
+
+REPORT_DIR="${REPORTS_DIR}/${STAGE}"
 REPORT_FILE="${REPORT_DIR}/result.json"
 LOG_FILE="${REPORT_DIR}/${STAGE}.log"
 
@@ -10,7 +14,7 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-if mvn -f ../app/pom.xml -DskipTests clean compile \
+if mvn -f "${APP_DIR}/pom.xml" -DskipTests clean compile \
      -B -ntp \
      >"$LOG_FILE" 2>&1; then
   STATUS="SUCCESS"
@@ -18,7 +22,7 @@ if mvn -f ../app/pom.xml -DskipTests clean compile \
   EXIT_CODE=0
 else
   STATUS="FAILED"
-  MESSAGE="${STAGE} stage failed , see logs at ${LOG_FILE} "
+  MESSAGE="${STAGE} stage failed, see logs at ${LOG_FILE}"
   EXIT_CODE=1
 fi
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-WORKSPACES_DIR = BASE_DIR / "workspaces"
+WORKSPACES_DIR = Path("/workspaces")
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024        # 50 MB
 MAX_FILES = 10_000

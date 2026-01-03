@@ -23,6 +23,7 @@ def admit_job(
     metadata = {
         "job_id": workspace.job_id,
         "status": validation.status,
+        "execution_state": "QUEUED",
         "stack": stack,
         "versions": versions,
         "pipeline": pipeline,
