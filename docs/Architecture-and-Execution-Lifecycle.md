@@ -358,7 +358,7 @@ Worker runs:
 
 - `chown -R 10001:10001 <job_dir>`
 - `chmod -R u+rwx <job_dir>`
-- marks pipeline scripts executable
+- marks pipeline scripts executable (chmod +x)
 
 Reason:
 
