@@ -16,8 +16,11 @@ Content-Disposition: form-data; name="metadata"
     "build_tool": "3.9"
   },
   "pipeline": {
+    "run_secret_scan" : true,
     "run_build": true,
     "run_unit_tests": true,
+    "run_package": true,
+    "run_smoke": true,
     "run_sast": true,
     "run_sca": true,
     "run_secret_scan": true
@@ -47,8 +50,11 @@ Content-Type: application/json
     "build_tool": "3.9"
   },
   "pipeline": {
+    "run_secret_scan" : true,
     "run_build": true,
     "run_unit_tests": true,
+    "run_package": true,
+    "run_smoke": true,
     "run_sast": true,
     "run_sca": true,
     "run_secret_scan": true

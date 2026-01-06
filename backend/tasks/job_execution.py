@@ -155,20 +155,37 @@ def _pipeline_command(metadata: dict) -> str:
             f'echo "[PIPELINE] END {name}"'
         )
 
+    # 1. Secrets scan
+    if pipeline.get("run_secret_scan", True):
+        commands.append(stage("SECRETS", f"bash {base}/secrets.sh"))
+
+    # 2. Build
     if pipeline.get("run_build", True):
         commands.append(stage("BUILD", f"bash {base}/build.sh"))
 
+    # 3. Unit tests
     if pipeline.get("run_unit_tests", True):
         commands.append(stage("TEST", f"bash {base}/test.sh"))
 
+    # 4. SAST
     if pipeline.get("run_sast", False):
         commands.append(stage("SAST", f"bash {base}/sast.sh"))
 
+    # 5. SCA
     if pipeline.get("run_sca", False):
         commands.append(stage("SCA", f"bash {base}/sca.sh"))
 
-    if pipeline.get("run_secret_scan", False):
-        commands.append(stage("SECRETS", f"bash {base}/secrets.sh"))
+    # 6. Package
+    if pipeline.get("run_package", True):
+        commands.append(stage("PACKAGE", f"bash {base}/package.sh"))
+
+    # 7. Smoke tests
+    if pipeline.get("run_smoke", True):
+        commands.append(stage("SMOKE", f"bash {base}/smoke.sh"))
+
+    # 8. DAST
+    if pipeline.get("run_dast", False):
+        commands.append(stage("DAST", f"bash {base}/dast.sh"))
 
     return " && ".join(commands)
 
