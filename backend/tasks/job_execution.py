@@ -17,6 +17,12 @@ PIPELINE_STAGES = [
     ("run_dast", "DAST"),
 ]
 
+BLOCKING_STAGES = {
+    "BUILD",
+    "PACKAGE",
+    "SMOKE-TEST",
+}
+
 @celery_app.task(bind=True, name="execute_job")
 def execute_job(self, job_id: str):
 
@@ -187,11 +193,6 @@ def _run_stage(
         check=False,
     )
 
-    # read stage result.json
-    result_file = (
-        Path("/home/runner/reports") / stage.lower() / "result.json"
-    )
-
     try:
         raw = subprocess.check_output(
             [
@@ -213,14 +214,22 @@ def _run_stage(
         _write_state(job_dir, state)
         return
 
-    # FAILURE
+    # FAILURE (stage-level)
     state["stages"][stage]["status"] = "FAILED"
-    state["state"] = "FAILED"
     state["updated_at"] = _now()
-    state["error"] = result.get("message", "stage failed")
-    _write_state(job_dir, state)
 
-    raise RuntimeError(f"Stage {stage} failed")
+    if stage in BLOCKING_STAGES:
+        # hard stop pipeline
+        state["state"] = "FAILED"
+        state["error"] = result.get("message", "blocking stage failed")
+        _write_state(job_dir, state)
+        raise RuntimeError(f"Blocking stage {stage} failed")
+
+    # non-blocking failure → continue pipeline
+    state.setdefault("warnings", {})
+    state["warnings"][stage] = result.get("message", "stage failed")
+    _write_state(job_dir, state)
+    return
 
 def _read_state(job_dir: Path) -> dict:
     return json.loads((job_dir / "state.json").read_text())
