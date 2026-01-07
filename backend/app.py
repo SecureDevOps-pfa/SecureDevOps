@@ -25,11 +25,14 @@ class Versions(BaseModel):
 
 
 class Pipeline(BaseModel):
-    run_build: bool = True
-    run_unit_tests: bool = True
-    run_sast: bool = True
-    run_sca: bool = True
-    run_secret_scan: bool = True
+    run_secret_scan: bool = False
+    run_build: bool = False
+    run_unit_tests: bool = False
+    run_sast: bool = False
+    run_sca: bool = False
+    run_package: bool = False
+    run_smoke: bool = False
+    run_dast: bool = False
 
 
 class GitHubJobRequest(BaseModel):

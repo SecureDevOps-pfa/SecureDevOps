@@ -1,11 +1,21 @@
 import json
 import subprocess
-import platform
+from datetime import datetime, timezone
 
 from pathlib import Path
 from celery_app import celery_app
 from config import WORKSPACES_DIR
 
+PIPELINE_STAGES = [
+    ("run_secret_scan", "SECRETS"),
+    ("run_build", "BUILD"),
+    ("run_unit_tests", "TEST"),
+    ("run_sast", "SAST"),
+    ("run_sca", "SCA"),
+    ("run_package", "PACKAGE"),
+    ("run_smoke", "SMOKE-TEST"),
+    ("run_dast", "DAST"),
+]
 
 @celery_app.task(bind=True, name="execute_job")
 def execute_job(self, job_id: str):
@@ -13,46 +23,32 @@ def execute_job(self, job_id: str):
     job_dir = WORKSPACES_DIR / job_id
     metadata = json.loads((job_dir / "metadata.json").read_text())
 
-    _update_execution_state(job_dir, "RUNNING")
-
     try:
         _prepare_workspace_permissions(job_dir)
-        _init_reports_volume(metadata["job_id"])
-        _run_runner_container(job_dir, metadata)
-        _update_execution_state(job_dir, "SUCCEEDED")
+        _init_reports_volume(job_id)
+
+        stages = _resolve_pipeline_stages(metadata)
+        _init_state(job_dir, stages)
+
+        _start_runner_container(job_id, metadata)
+
+        for stage, status in stages.items():
+            if status == "PENDING":
+                _run_stage(job_dir, job_id, metadata, stage)
+
+        _finalize_job(job_dir, success=True)
 
     except Exception as exc:
-        _update_execution_state(job_dir, "FAILED", str(exc))
+        _finalize_job(job_dir, success=False, error=str(exc))
         raise
+
+    finally:
+        _stop_runner_container(job_id)
 
 
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
-
-def _update_execution_state(
-    job_dir: Path,
-    state: str,
-    error: str | None = None,
-):
-    """
-    Persist execution state for the job.
-    """
-
-    state_file = job_dir / "state.json"
-
-    payload = {
-        "state": state,
-    }
-
-    if error:
-        payload["error"] = error
-
-    state_file.write_text(
-        json.dumps(payload, indent=2),
-        encoding="utf-8",
-    )
-
 def _prepare_workspace_permissions(job_dir: Path):
 
     subprocess.run(
@@ -86,34 +82,67 @@ def _init_reports_volume(job_id: str):
         check=True
     )
 
-def _run_runner_container(job_dir: Path, metadata: dict):
+def _resolve_pipeline_stages(metadata: dict) -> dict:
     """
-    Run the Docker runner and execute pipeline scripts.
+    Returns:
+    {
+      "SECRETS": "SKIPPED",
+      "BUILD": "PENDING",
+      "TEST": "PENDING",
+      ...
+    }
     """
+    pipeline = metadata.get("pipeline", {})
 
+    stages = {}
+    for flag, stage in PIPELINE_STAGES:
+        if pipeline.get(flag, False):
+            stages[stage] = "PENDING"
+        else:
+            stages[stage] = "SKIPPED"
+
+    return stages
+
+def _init_state(job_dir: Path, stages: dict):
+    state = {
+        "state": "RUNNING",
+        "current_stage": None,
+        "updated_at": _now(),
+        "stages": {
+            stage: {"status": status}
+            for stage, status in stages.items()
+        },
+    }
+    _write_state(job_dir, state)
+
+def _write_state(job_dir: Path, payload: dict):
+    (job_dir / "state.json").write_text(
+        json.dumps(payload, indent=2),
+        encoding="utf-8",
+    )
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+def _start_runner_container(job_id: str, metadata: dict):
     image = _select_runner_image(metadata)
-    job_id = job_dir.name
 
     subprocess.run(
         [
-            "docker", "run", "--rm",
+            "docker", "run", "-d",
+            "--name", f"runner-{job_id}",
+            "-u", "10001:10001",
 
-            *_docker_user_args(),
-
-            # MUST be f-strings
             "-e", f"APP_DIR=/home/runner/workspaces/{job_id}/source",
             "-e", f"PIPELINES_DIR=/home/runner/workspaces/{job_id}/pipelines",
             "-e", "REPORTS_DIR=/home/runner/reports",
 
-            # mount named volume
             "-v", "securedevops_workspaces:/home/runner/workspaces",
-
-            # reports volume stays as-is
             "-v", f"reports-{job_id}:/home/runner/reports",
 
             "-w", "/home/runner",
             image,
-            "bash", "-c", _pipeline_command(metadata),
+            "tail", "-f", "/dev/null",
         ],
         check=True,
     )
@@ -131,63 +160,70 @@ def _select_runner_image(metadata: dict) -> str:
 
     raise RuntimeError("Unsupported stack for runner selection")
 
+def _run_stage(
+    job_dir: Path,
+    job_id: str,
+    metadata: dict,
+    stage: str,
+):
+    state = _read_state(job_dir)
 
-def _docker_user_args():
-    return ["-u", "10001:10001"]
+    # update state → RUNNING
+    state["current_stage"] = stage
+    state["stages"][stage]["status"] = "RUNNING"
+    state["updated_at"] = _now()
+    _write_state(job_dir, state)
 
-def _pipeline_command(metadata: dict) -> str:
-    """
-    Build pipeline execution command based on metadata.
-    (Minimal version for deadline.)
-    """
-
-    pipeline = metadata.get("pipeline", {})
     pipeline_dir = _resolve_pipeline_dir(metadata)
+    stage_script = f"$PIPELINES_DIR/{pipeline_dir}/{stage.lower()}.sh"
 
-    base = f"$PIPELINES_DIR/{pipeline_dir}"
+    subprocess.run(
+        [
+            "docker", "exec",
+            f"runner-{job_id}",
+            "bash", "-lc",
+            f"bash {stage_script}",
+        ],
+        check=False,
+    )
 
-    commands = []
+    # read stage result.json
+    result_file = (
+        Path("/home/runner/reports") / stage.lower() / "result.json"
+    )
 
-    def stage(name: str, cmd: str):
-        return (
-            f'echo "[PIPELINE] START {name}" && '
-            f'{cmd} && '
-            f'echo "[PIPELINE] END {name}"'
+    try:
+        raw = subprocess.check_output(
+            [
+                "docker", "exec", f"runner-{job_id}",
+                "bash", "-lc",
+                f"cat $REPORTS_DIR/{stage.lower()}/result.json",
+            ],
+            text=True,
         )
+    except subprocess.CalledProcessError:
+        raise RuntimeError(f"{stage} did not produce result.json in reports volume")
 
-    # 1. Secrets scan
-    if pipeline.get("run_secret_scan", True):
-        commands.append(stage("SECRETS", f"bash {base}/secrets.sh"))
+    result = json.loads(raw)
 
-    # 2. Build
-    if pipeline.get("run_build", True):
-        commands.append(stage("BUILD", f"bash {base}/build.sh"))
 
-    # 3. Unit tests
-    if pipeline.get("run_unit_tests", True):
-        commands.append(stage("TEST", f"bash {base}/test.sh"))
+    if result["status"] == "SUCCESS":
+        state["stages"][stage]["status"] = "SUCCESS"
+        state["updated_at"] = _now()
+        _write_state(job_dir, state)
+        return
 
-    # 4. SAST
-    if pipeline.get("run_sast", False):
-        commands.append(stage("SAST", f"bash {base}/sast.sh"))
+    # FAILURE
+    state["stages"][stage]["status"] = "FAILED"
+    state["state"] = "FAILED"
+    state["updated_at"] = _now()
+    state["error"] = result.get("message", "stage failed")
+    _write_state(job_dir, state)
 
-    # 5. SCA
-    if pipeline.get("run_sca", False):
-        commands.append(stage("SCA", f"bash {base}/sca.sh"))
+    raise RuntimeError(f"Stage {stage} failed")
 
-    # 6. Package
-    if pipeline.get("run_package", True):
-        commands.append(stage("PACKAGE", f"bash {base}/package.sh"))
-
-    # 7. Smoke tests
-    if pipeline.get("run_smoke", True):
-        commands.append(stage("SMOKE", f"bash {base}/smoke.sh"))
-
-    # 8. DAST
-    if pipeline.get("run_dast", False):
-        commands.append(stage("DAST", f"bash {base}/dast.sh"))
-
-    return " && ".join(commands)
+def _read_state(job_dir: Path) -> dict:
+    return json.loads((job_dir / "state.json").read_text())
 
 def _resolve_pipeline_dir(metadata: dict) -> str:
     stack = metadata.get("stack", {})
@@ -199,3 +235,27 @@ def _resolve_pipeline_dir(metadata: dict) -> str:
         raise RuntimeError("Invalid metadata: missing framework or build_tool")
 
     return f"{framework}-{build_tool}"
+
+def _finalize_job(
+    job_dir: Path,
+    success: bool,
+    error: str | None = None,
+):
+    state = _read_state(job_dir)
+    state["state"] = "SUCCEEDED" if success else "FAILED"
+    state["current_stage"] = None
+    state["updated_at"] = _now()
+
+    if error:
+        state["error"] = error
+
+    _write_state(job_dir, state)
+
+def _stop_runner_container(job_id: str):
+    subprocess.run(
+        ["docker", "rm", "-f", f"runner-{job_id}"],
+        check=False,
+    )
+
+
+
