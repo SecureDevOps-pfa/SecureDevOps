@@ -1,10 +1,11 @@
 import json
 import subprocess
 from datetime import datetime, timezone
-
 from pathlib import Path
+
 from celery_app import celery_app
 from config import WORKSPACES_DIR
+
 
 PIPELINE_STAGES = [
     ("run_secret_scan", "SECRETS"),
@@ -23,15 +24,16 @@ BLOCKING_STAGES = {
     "SMOKE-TEST",
 }
 
+
 @celery_app.task(bind=True, name="execute_job")
 def execute_job(self, job_id: str):
-
     job_dir = WORKSPACES_DIR / job_id
     metadata = json.loads((job_dir / "metadata.json").read_text())
 
     try:
         _prepare_workspace_permissions(job_dir)
-        _init_reports_volume(job_id)
+        # ensure reports directory exists inside workspace
+        (job_dir / "reports").mkdir(parents=True, exist_ok=True)
 
         stages = _resolve_pipeline_stages(metadata)
         _init_state(job_dir, stages)
@@ -55,8 +57,8 @@ def execute_job(self, job_id: str):
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
-def _prepare_workspace_permissions(job_dir: Path):
 
+def _prepare_workspace_permissions(job_dir: Path):
     subprocess.run(
         ["chown", "-R", "10001:10001", str(job_dir)],
         check=True,
@@ -72,21 +74,6 @@ def _prepare_workspace_permissions(job_dir: Path):
         for script in pipelines_dir.glob("*.sh"):
             script.chmod(0o755)
 
-def _init_reports_volume(job_id: str):
-    """
-    Ensure the reports volume is writable by UID 10001
-    """
-    volume_name = f"reports-{job_id}"
-
-    subprocess.run(
-        [
-            "docker", "run", "--rm",
-            "-v", f"{volume_name}:/home/runner/reports",
-            "busybox",
-            "sh", "-c", "chown -R 10001:10001 /home/runner/reports"
-        ],
-        check=True
-    )
 
 def _resolve_pipeline_stages(metadata: dict) -> dict:
     """
@@ -109,6 +96,7 @@ def _resolve_pipeline_stages(metadata: dict) -> dict:
 
     return stages
 
+
 def _init_state(job_dir: Path, stages: dict):
     state = {
         "state": "RUNNING",
@@ -121,14 +109,17 @@ def _init_state(job_dir: Path, stages: dict):
     }
     _write_state(job_dir, state)
 
+
 def _write_state(job_dir: Path, payload: dict):
     (job_dir / "state.json").write_text(
         json.dumps(payload, indent=2),
         encoding="utf-8",
     )
 
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
 
 def _start_runner_container(job_id: str, metadata: dict):
     image = _select_runner_image(metadata)
@@ -141,10 +132,9 @@ def _start_runner_container(job_id: str, metadata: dict):
 
             "-e", f"APP_DIR=/home/runner/workspaces/{job_id}/source",
             "-e", f"PIPELINES_DIR=/home/runner/workspaces/{job_id}/pipelines",
-            "-e", "REPORTS_DIR=/home/runner/reports",
+            "-e", f"REPORTS_DIR=/home/runner/workspaces/{job_id}/reports",
 
             "-v", "securedevops_workspaces:/home/runner/workspaces",
-            "-v", f"reports-{job_id}:/home/runner/reports",
 
             "-w", "/home/runner",
             image,
@@ -153,18 +143,15 @@ def _start_runner_container(job_id: str, metadata: dict):
         check=True,
     )
 
-def _select_runner_image(metadata: dict) -> str:
-    """
-    Select Docker runner image based on stack metadata.
-    Minimal mapping for now.
-    """
 
+def _select_runner_image(metadata: dict) -> str:
     stack = metadata.get("stack", {})
 
     if stack.get("language") == "java" and stack.get("build_tool") == "maven":
         return "abderrahmane03/pipelinex:java17-mvn3.9.12-latest"
 
     raise RuntimeError("Unsupported stack for runner selection")
+
 
 def _run_stage(
     job_dir: Path,
@@ -179,6 +166,20 @@ def _run_stage(
     state["stages"][stage]["status"] = "RUNNING"
     state["updated_at"] = _now()
     _write_state(job_dir, state)
+
+    # CREATE STAGE-SPECIFIC REPORT DIRECTORY WITH PROPER PERMISSIONS
+    stage_report_dir = job_dir / "reports" / stage.lower()
+    stage_report_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Ensure the stage report directory has proper permissions
+    subprocess.run(
+        ["chown", "-R", "10001:10001", str(stage_report_dir)],
+        check=True,
+    )
+    subprocess.run(
+        ["chmod", "-R", "u+rwx", str(stage_report_dir)],
+        check=True,
+    )
 
     pipeline_dir = _resolve_pipeline_dir(metadata)
     stage_script = f"$PIPELINES_DIR/{pipeline_dir}/{stage.lower()}.sh"
@@ -203,10 +204,11 @@ def _run_stage(
             text=True,
         )
     except subprocess.CalledProcessError:
-        raise RuntimeError(f"{stage} did not produce result.json in reports volume")
+        raise RuntimeError(
+            f"{stage} did not produce result.json in workspace reports directory"
+        )
 
     result = json.loads(raw)
-
 
     if result["status"] == "SUCCESS":
         state["stages"][stage]["status"] = "SUCCESS"
@@ -219,7 +221,6 @@ def _run_stage(
     state["updated_at"] = _now()
 
     if stage in BLOCKING_STAGES:
-        # hard stop pipeline
         state["state"] = "FAILED"
         state["error"] = result.get("message", "blocking stage failed")
         _write_state(job_dir, state)
@@ -229,10 +230,11 @@ def _run_stage(
     state.setdefault("warnings", {})
     state["warnings"][stage] = result.get("message", "stage failed")
     _write_state(job_dir, state)
-    return
+
 
 def _read_state(job_dir: Path) -> dict:
     return json.loads((job_dir / "state.json").read_text())
+
 
 def _resolve_pipeline_dir(metadata: dict) -> str:
     stack = metadata.get("stack", {})
@@ -244,6 +246,7 @@ def _resolve_pipeline_dir(metadata: dict) -> str:
         raise RuntimeError("Invalid metadata: missing framework or build_tool")
 
     return f"{framework}-{build_tool}"
+
 
 def _finalize_job(
     job_dir: Path,
@@ -260,11 +263,9 @@ def _finalize_job(
 
     _write_state(job_dir, state)
 
+
 def _stop_runner_container(job_id: str):
     subprocess.run(
         ["docker", "rm", "-f", f"runner-{job_id}"],
         check=False,
     )
-
-
-
