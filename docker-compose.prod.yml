@@ -1,0 +1,30 @@
+services:
+  backend:
+    image: abderrahmane03/pipelinex:backend-latest
+    container_name: pipelinex-backend
+    volumes:
+      - workspaces:/workspaces
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+
+  worker:
+    image: abderrahmane03/pipelinex:backend-latest
+    container_name: pipelinex-worker
+    command: celery -A celery_app.celery_app worker --loglevel=info
+    volumes:
+      - workspaces:/workspaces
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: pipelinex-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  workspaces:
