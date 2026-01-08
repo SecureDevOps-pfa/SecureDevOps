@@ -7,15 +7,29 @@ PIPELINES_ROOT = REPO_ROOT / "pipelines"
 
 
 def install_pipelines(workspace: Workspace, framework: str):
-    src = PIPELINES_ROOT / framework
-    dst = workspace.job_dir / "pipelines" / framework
+    pipelines_dst = workspace.job_dir / "pipelines"
 
-    if not src.exists():
+    # ---- install global pipelines (framework-independent) ----
+    global_src = PIPELINES_ROOT / "global"
+    global_dst = pipelines_dst / "global"
+
+    if not global_src.exists():
+        raise RuntimeError("Global pipelines directory not found")
+
+    if global_dst.exists():
+        shutil.rmtree(global_dst, ignore_errors=True)
+
+    global_dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(global_src, global_dst)
+
+    # ---- install framework-specific pipelines ----
+    framework_src = PIPELINES_ROOT / framework
+    framework_dst = pipelines_dst / framework
+
+    if not framework_src.exists():
         raise RuntimeError(f"Pipelines not found for framework: {framework}")
 
-    if dst.exists():
-        shutil.rmtree(dst, ignore_errors=True)
+    if framework_dst.exists():
+        shutil.rmtree(framework_dst, ignore_errors=True)
 
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(src, dst)
-
+    shutil.copytree(framework_src, framework_dst)

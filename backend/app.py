@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from typing import Literal
 from pydantic import BaseModel
 import json
 
@@ -26,6 +27,7 @@ class Versions(BaseModel):
 
 class Pipeline(BaseModel):
     run_secret_scan: bool = False
+    secret_scan_mode: Literal["dir", "git"] = "dir"
     run_build: bool = False
     run_unit_tests: bool = False
     run_sast: bool = False

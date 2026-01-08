@@ -39,7 +39,7 @@ def handle_zip_input(file: UploadFile):
     if not is_valid_zip_signature(raw[:8]):
         raise ValueError("File is not a valid ZIP archive")
 
-    workspace = create_workspace()
+    workspace = create_workspace(input_type="zip")
 
     try:
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:

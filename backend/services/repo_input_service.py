@@ -33,33 +33,37 @@ def _is_valid_github_url(url: str) -> bool:
     )
 
 
-def clone_github_repository(github_url: str):
+def clone_github_repository(
+    github_url: str,
+    *,
+    keep_git: bool = False,
+    full_history: bool = False,
+):
     if not _is_valid_github_url(github_url):
         raise ValueError("Only public GitHub repositories are allowed")
 
-    workspace = create_workspace()
+    workspace = create_workspace(input_type="github")
 
     try:
+        cmd = ["git", "clone", "--no-tags", "--single-branch"]
+
+        if not full_history:
+            cmd += ["--depth", str(GIT_MAX_DEPTH)]
+
+        cmd += [github_url, str(workspace.source_dir)]
+
         subprocess.run(
-            [
-                "git",
-                "clone",
-                "--depth",
-                str(GIT_MAX_DEPTH),
-                "--no-tags",
-                "--single-branch",
-                github_url,
-                str(workspace.source_dir),
-            ],
+            cmd,
             timeout=GIT_CLONE_TIMEOUT,
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
 
-        git_dir = workspace.source_dir / ".git"
-        if git_dir.exists():
-            _force_remove(git_dir)
+        if not keep_git:
+            git_dir = workspace.source_dir / ".git"
+            if git_dir.exists():
+                _force_remove(git_dir)
 
         scan_repo(
             workspace.source_dir,

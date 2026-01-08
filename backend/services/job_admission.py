@@ -13,6 +13,15 @@ def admit_job(
     versions: dict,
     pipeline: dict,
 ):
+    if (
+        pipeline.get("run_secret_scan")
+        and pipeline.get("secret_scan_mode") == "git"
+        and workspace.input_type == "zip"
+    ):
+        raise ValueError(
+            "Secret scan mode 'git' is not supported for ZIP inputs (no git history)"
+        )
+    
     contract = Path("contracts/spring-boot-maven.json")
 
     validation = validate_structure(workspace.source_dir, contract)

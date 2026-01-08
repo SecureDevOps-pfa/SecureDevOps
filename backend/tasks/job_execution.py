@@ -24,6 +24,11 @@ BLOCKING_STAGES = {
     "SMOKE-TEST",
 }
 
+SECRETS_SCRIPT_BY_MODE = {
+    "dir": "secrets-dir.sh",
+    "git": "secrets-git.sh",
+}
+
 
 @celery_app.task(bind=True, name="execute_job")
 def execute_job(self, job_id: str):
@@ -31,10 +36,11 @@ def execute_job(self, job_id: str):
     metadata = json.loads((job_dir / "metadata.json").read_text())
 
     try:
-        _prepare_workspace_permissions(job_dir)
         # ensure reports directory exists inside workspace
         (job_dir / "reports").mkdir(parents=True, exist_ok=True)
 
+        _prepare_workspace_permissions(job_dir)
+        
         stages = _resolve_pipeline_stages(metadata)
         _init_state(job_dir, stages)
 
@@ -71,7 +77,7 @@ def _prepare_workspace_permissions(job_dir: Path):
 
     pipelines_dir = job_dir / "pipelines"
     if pipelines_dir.exists():
-        for script in pipelines_dir.glob("*.sh"):
+        for script in pipelines_dir.rglob("*.sh"):
             script.chmod(0o755)
 
 
@@ -181,8 +187,17 @@ def _run_stage(
         check=True,
     )
 
-    pipeline_dir = _resolve_pipeline_dir(metadata)
-    stage_script = f"$PIPELINES_DIR/{pipeline_dir}/{stage.lower()}.sh"
+    stage_script = _resolve_stage_script(metadata, stage)
+
+    subprocess.run(
+        [
+            "docker", "exec",
+            f"runner-{job_id}",
+            "bash", "-lc",
+            "chmod -R u+rwx $REPORTS_DIR || true",
+        ],
+        check=False,
+    )
 
     subprocess.run(
         [
@@ -193,6 +208,24 @@ def _run_stage(
         ],
         check=False,
     )
+
+    if stage == "SECRETS":
+        subprocess.run(
+            [
+                "docker", "exec",
+                f"runner-{job_id}",
+                "bash", "-lc",
+                (
+                    "mkdir -p $REPORTS_DIR/secrets && "
+                    "if [ -f $REPORTS_DIR/secrets-dir/result.json ]; then "
+                    "mv $REPORTS_DIR/secrets-dir/* $REPORTS_DIR/secrets/; "
+                    "elif [ -f $REPORTS_DIR/secrets-git/result.json ]; then "
+                    "mv $REPORTS_DIR/secrets-git/* $REPORTS_DIR/secrets/; "
+                    "fi"
+                ),
+            ],
+            check=True,
+        )
 
     try:
         raw = subprocess.check_output(
@@ -235,6 +268,20 @@ def _run_stage(
 def _read_state(job_dir: Path) -> dict:
     return json.loads((job_dir / "state.json").read_text())
 
+def _resolve_stage_script(metadata: dict, stage: str) -> str:
+    if stage == "SECRETS":
+        pipeline = metadata.get("pipeline", {})
+        mode = pipeline.get("secret_scan_mode", "dir")
+
+        script = SECRETS_SCRIPT_BY_MODE.get(mode)
+        if not script:
+            raise RuntimeError(f"Unsupported secret scan mode: {mode}")
+
+        return f"$PIPELINES_DIR/global/{script}"
+
+    pipeline_dir = _resolve_pipeline_dir(metadata)
+    return f"$PIPELINES_DIR/{pipeline_dir}/{stage.lower()}.sh"
+
 
 def _resolve_pipeline_dir(metadata: dict) -> str:
     stack = metadata.get("stack", {})
@@ -246,7 +293,6 @@ def _resolve_pipeline_dir(metadata: dict) -> str:
         raise RuntimeError("Invalid metadata: missing framework or build_tool")
 
     return f"{framework}-{build_tool}"
-
 
 def _finalize_job(
     job_dir: Path,

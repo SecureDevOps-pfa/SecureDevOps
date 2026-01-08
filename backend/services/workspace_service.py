@@ -10,6 +10,7 @@ class Workspace:
     job_id: str
     job_dir: Path
     source_dir: Path
+    input_type: str
 
 
 def _generate_job_id() -> str:
@@ -18,7 +19,7 @@ def _generate_job_id() -> str:
     return f"job-{len(existing) + 1:03d}"
 
 
-def create_workspace() -> Workspace:
+def create_workspace(*, input_type: str) -> Workspace:
     job_id = _generate_job_id()
     job_dir = WORKSPACES_DIR / job_id
     source_dir = job_dir / "source"
@@ -31,6 +32,7 @@ def create_workspace() -> Workspace:
         job_id=job_id,
         job_dir=job_dir,
         source_dir=source_dir,
+        input_type=input_type,
     )
 
 def cleanup_workspace(workspace: Workspace):

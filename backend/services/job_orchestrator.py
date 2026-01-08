@@ -41,7 +41,18 @@ class JobOrchestrator:
         workspace = None
 
         try:
-            workspace = clone_github_repository(github_url)
+            pipeline = metadata["pipeline"]
+            run_secret_scan = pipeline.get("run_secret_scan", False)
+            secret_scan_mode = pipeline.get("secret_scan_mode", "dir")
+
+            keep_git = run_secret_scan and secret_scan_mode == "git"
+            full_history = keep_git
+
+            workspace = clone_github_repository(
+                github_url,
+                keep_git=keep_git,
+                full_history=full_history,
+            )
 
             job_metadata = admit_job(
                 workspace=workspace,
