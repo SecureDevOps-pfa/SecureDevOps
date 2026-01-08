@@ -6,12 +6,11 @@
 
 - Les inputs sont d’abord vérifiés au niveau sécurité : absence de fichiers exécutables, protection contre les ZIP explosifs, limitation de la taille maximale, du nombre de fichiers et de la profondeur des dossiers.
 
-![](images/workflow1/validation.jpeg)
-
 - Si aucun risque n’est détecté, le projet est extrait et sa structure est validée selon des guidelines que nous définissons (formes canoniques par framework).  
   Exemple : pour un projet Spring Boot, une seule classe annotée `@SpringBootApplication` est requise.  
   Le projet reçoit ensuite un statut : `accepted` ou `accepted_with_issues` (ex. : tests demandés mais aucun test présent dans `src/`).
 
+![](images/workflow1/validation.jpeg)
 
 - Après validation de la structure, un fichier `metadata.json` est généré contenant les informations nécessaires (framework, versions des dépendances, étapes du pipeline sélectionnées, etc.).
 
