@@ -4,7 +4,7 @@ set -Eeuo pipefail
 : "${REPORTS_DIR:?REPORTS_DIR not set}"
 : "${APP_DIR:?APP_DIR not set}"
 
-STAGE="secrets-dir"
+STAGE="secrets-git"
 REPORT_DIR="${REPORTS_DIR}/${STAGE}"
 REPORT_FILE="${REPORT_DIR}/result.json"
 LOG_FILE="${REPORT_DIR}/${STAGE}.json"
