@@ -26,3 +26,4 @@ outputs/
 workspaces-test/job-test
 workspace-directly/
 workspace-runner/
+workdir/
