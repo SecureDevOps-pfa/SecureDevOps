@@ -22,5 +22,5 @@ jobs:
         run: |
           IMAGE="${{ secrets.DOCKER_USERNAME }}/pipelinex:backend-latest"
           
-          docker build -t "$IMAGE" backend
+          docker build -f backend/Dockerfile -t "$IMAGE" .
           docker push "$IMAGE"
