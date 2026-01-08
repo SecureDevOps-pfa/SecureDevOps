@@ -65,3 +65,11 @@ ls -ld $PWD
 ls -ld workspace-runner
 ls -ld workspace-runner/reports
 ```
+
+
+
+
+
+#### secrets with gitleak 
+- the user gets to chose wether to scan only the working tree (actual current files )  or the full commit history 
+- if the second is chosen the user is given a generated command to remove their trace from history 

@@ -15,6 +15,10 @@ RUN apt-get update && \
         bash && \
     rm -rf /var/lib/apt/lists/*
 
+# ---------- gitleaks install ----------
+COPY gitleaks /usr/local/bin/gitleaks
+RUN chmod +x /usr/local/bin/gitleaks
+
 # ---------- maven install ----------
 ENV MAVEN_VERSION=3.9.12
 ENV MAVEN_HOME=/opt/maven
