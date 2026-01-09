@@ -52,6 +52,8 @@ Content-Type: application/json
     "secret_scan_mode": "git",
     "run_build": true,
     "run_unit_tests": true,
+    "run_sast": true,
+    "run_sca": true,
     "run_package": true,
     "run_smoke": true
   }
