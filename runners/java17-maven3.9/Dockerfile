@@ -13,8 +13,15 @@ RUN apt-get update && \
         curl \
         unzip \
         ca-certificates \
-        bash && \
+        bash \
+        snapd && \
     rm -rf /var/lib/apt/lists/*
+
+# Make sure snap binaries are in PATH
+ENV PATH="/snap/bin:$PATH"
+
+# Install Semgrep via Snap
+RUN snap install semgrep
 
 # ---------- gitleaks install ----------
 COPY gitleaks /usr/local/bin/gitleaks

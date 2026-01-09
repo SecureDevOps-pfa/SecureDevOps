@@ -16,6 +16,9 @@ RUN apt-get update && \
         bash && \
     rm -rf /var/lib/apt/lists/*
 
+#semgrep 
+RUN snap install semgrep
+
 # ---------- gitleaks install ----------
 COPY gitleaks /usr/local/bin/gitleaks
 RUN chmod +x /usr/local/bin/gitleaks

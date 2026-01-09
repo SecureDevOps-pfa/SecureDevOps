@@ -4,10 +4,4 @@
 docker build -f java17-maven3.9/Dockerfile -t abderrahmane03/pipelinex:java17-mvn3.9.12-latest .
 ```
 
-docker run --rm -it \
-  -u 10001:10001 \
-  -v workdir/<job-id>/app:/home/runner/app:rw \
-  -v workdir/<job-id>/pipelines:/home/runner/pipelines:ro \
-  -v workdir/<job-id>/reports:/home/runner/reports:rw \
-  -w /home/runner \
-  abderrahmane03/pipelinex:java17-mvn3.9.12-latest
+docker run --rm -it   -u 10001:10001   -v workdir/app:/home/runner/app:rw   -v workdir/pipelines:/home/runner/pipelines:ro   -v workdir/reports:/home/runner/reports:rw   -w /home/runner   abderrahmane03/pipelinex:java17-mvn3.9.12-latest
