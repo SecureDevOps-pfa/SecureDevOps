@@ -5,3 +5,6 @@ docker build -f java17-maven3.9/Dockerfile -t abderrahmane03/pipelinex:java17-mv
 ```
 
 docker run --rm -it   -u 10001:10001   -v workdir/app:/home/runner/app:rw   -v workdir/pipelines:/home/runner/pipelines:ro   -v workdir/reports:/home/runner/reports:rw   -w /home/runner   abderrahmane03/pipelinex:java17-mvn3.9.12-latest
+
+
+just to trigger runner push 
