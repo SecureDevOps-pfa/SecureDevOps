@@ -13,7 +13,8 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-semgrep --config=p/java --json --output "${REPORT_FILE}" "${APP_DIR}"
+trivy fs --scanners vuln "${APP_DIR}/pom.xml" --format json --output "${LOG_FILE}"
+
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then

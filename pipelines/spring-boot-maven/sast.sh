@@ -13,8 +13,7 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-trivy fs "$APP_DIR" --skip-dirs target --output "${LOG_FILE}"
-EXIT_CODE=$?
+semgrep --config=p/java --json --output "${LOG_FILE}" "${APP_DIR}"EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
     STATUS="SUCCESS"
