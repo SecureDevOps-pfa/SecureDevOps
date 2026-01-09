@@ -73,7 +73,7 @@ jobs:
 
       - name: Build and push runner
         run: |
-          IMAGE="${{ secrets.DOCKER_USERNAME }}/pipelinex:java17-maven3.9-latest"
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/pipelinex:java17-mvn3.9.12-latest"
           docker build -f runners/java17-maven3.9/Dockerfile -t "$IMAGE" runners
           docker push "$IMAGE"
 
