@@ -14,18 +14,33 @@ RUN apt-get update && \
         unzip \
         ca-certificates \
         bash \
-        snapd && \
+        python3 \
+        python3-pip \
+        pipx && \
     rm -rf /var/lib/apt/lists/*
 
-# Make sure snap binaries are in PATH
-ENV PATH="/snap/bin:$PATH"
+# --- pipx env (required for  semgrep , tried other methods and this is the simplest so far ) -----
+ENV PIPX_HOME=/opt/pipx
+ENV PIPX_BIN_DIR=/usr/local/bin
+ENV PATH=/usr/local/bin:$PATH
 
-# Install Semgrep via Snap
-RUN snap install semgrep
+# ---------- semgrep ----------
+RUN pipx install semgrep && \
+    semgrep --version
 
 # ---------- gitleaks install ----------
 COPY gitleaks /usr/local/bin/gitleaks
 RUN chmod +x /usr/local/bin/gitleaks
+
+# ---------- trivy ----------
+# latest version last time i checked 
+ENV TRIVY_VERSION=0.68.2 
+RUN curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_0.68.2_Linux-64bit.tar.gz \
+    -o /tmp/trivy.tar.gz && \
+    tar -xzvf /tmp/trivy.tar.gz -C /tmp && \
+    mv /tmp/trivy /usr/local/bin/trivy && \
+    chmod +x /usr/local/bin/trivy && \
+    rm /tmp/trivy.tar.gz
 
 # ---------- maven install ----------
 ENV MAVEN_VERSION=3.9.12
