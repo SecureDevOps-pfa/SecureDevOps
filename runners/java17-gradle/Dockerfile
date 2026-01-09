@@ -9,11 +9,16 @@ LABEL gradle.version="8.7"
 # ---------- system deps ----------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        git \
         curl \
         unzip \
         ca-certificates \
         bash && \
     rm -rf /var/lib/apt/lists/*
+
+# ---------- gitleaks install ----------
+COPY gitleaks /usr/local/bin/gitleaks
+RUN chmod +x /usr/local/bin/gitleaks
 
 # ---------- gradle install ----------
 ENV GRADLE_VERSION=8.7
