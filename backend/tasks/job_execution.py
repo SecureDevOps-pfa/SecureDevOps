@@ -204,7 +204,7 @@ def _run_stage(
             "docker", "exec",
             f"runner-{job_id}",
             "bash", "-lc",
-            f"bash {stage_script}",
+            f'cd "$APP_DIR" && bash {stage_script}',
         ],
         check=False,
     )
