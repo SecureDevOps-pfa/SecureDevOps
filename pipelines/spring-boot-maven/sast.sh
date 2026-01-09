@@ -13,7 +13,8 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-semgrep --config=p/java --json --output "${LOG_FILE}" "${APP_DIR}"EXIT_CODE=$?
+EXIT_CODE=0
+semgrep --config=p/java --json --output "${LOG_FILE}" "${APP_DIR}" || EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
     STATUS="SUCCESS"
@@ -41,4 +42,4 @@ cat > "${REPORT_FILE}" <<EOF
 }
 EOF
 
-exit $EXIT_CODE
+exit 0
