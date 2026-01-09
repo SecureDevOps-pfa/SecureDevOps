@@ -9,6 +9,7 @@ LABEL maven.version="3.9.12"
 # ---------- system deps ----------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        git \
         curl \
         unzip \
         ca-certificates \
