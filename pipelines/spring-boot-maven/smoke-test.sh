@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-: "${APP_DIR:?APP_DIR not set}"
-: "${REPORTS_DIR:?REPORTS_DIR not set}"
+REPORTS_DIR="${REPORTS_DIR:-../reports}"
+APP_DIR="${APP_DIR:-../source}"
 
 STAGE="smoke-test"
 

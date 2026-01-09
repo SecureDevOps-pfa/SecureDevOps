@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-: "${REPORTS_DIR:?REPORTS_DIR not set}"
-: "${APP_DIR:?APP_DIR not set}"
+REPORTS_DIR="${REPORTS_DIR:-../reports}"
+APP_DIR="${APP_DIR:-../source}"
 
 STAGE="secrets-git"
 REPORT_DIR="${REPORTS_DIR}/${STAGE}"
@@ -13,7 +13,7 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-gitleaks git . --report-format json --report-path "${LOG_FILE}"
+gitleaks git "$APP_DIR" --report-format json --report-path "${LOG_FILE}"
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
