@@ -7,6 +7,7 @@ DOCKER_NETWORK="${DOCKER_NETWORK:-pipelinex-network}"
 REPORT_DIR="${REPORTS_DIR}/${STAGE}"
 REPORT_FILE="${REPORT_DIR}/result.json"
 
+
 APP_PORT="${APP_PORT:-8080}"
 TARGET_URL="http://app:${APP_PORT}"
 
@@ -14,14 +15,21 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-docker run --rm \
-  --network "${DOCKER_NETWORK}" \
-  -v "${REPORT_DIR}:/zap/wrk" \
-  ghcr.io/zaproxy/zaproxy:stable \
-  zap-baseline.py \
-    -t "${TARGET_URL}" \
-    -J dast.json \
-    -r dast.html
+#raw command, ill keep it for now . 
+# docker run --rm \
+#   --network "${DOCKER_NETWORK}" \
+#   -v "${REPORT_DIR}:/zap/wrk" \
+#   ghcr.io/zaproxy/zaproxy:stable \
+#   zap-baseline.py \
+#     -t "${TARGET_URL}" \
+#     -J dast.json \
+#     -r dast.html
+
+# assumes to be ran from docker-compose.dast.yml
+zap-baseline.py \
+  -t "${TARGET_URL}" \
+  -J dast.json \
+  -r dast.html
 
 EXIT_CODE=$?
 

@@ -1,0 +1,35 @@
+services:
+  app:
+    image: abderrahmane03/pipelinex:java17-mvn3.9-latest
+    working_dir: /workspaces/source
+    volumes:
+      - ./workspaces/${JOB_ID:-.}:/workspaces
+    command: mvn spring-boot:run
+    expose:
+      - "${PORT:-8080}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    depends_on:
+      app:
+        condition: service_healthy
+    working_dir: /workspaces
+    volumes:
+      - ./workspaces/${JOB_ID:-.}:/workspaces
+    environment:
+      APP_PORT: "${PORT:-8080}"
+      REPORTS_DIR: /workspaces/reports
+    command: ["/bin/bash", "/workspaces/pipelines/dast.sh"]
+
+networks:
+  default:
+    name: "${DOCKER_NETWORK:-pipelinex-network}"
+
+
+
+
