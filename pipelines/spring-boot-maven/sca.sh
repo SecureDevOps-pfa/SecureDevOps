@@ -28,7 +28,7 @@ elif [ $EXIT_CODE -eq 2 ]; then
     MESSAGE="Semgrep execution error"
 else
     STATUS="UNKNOWN"
-    MESSAGE="Unknown exit code $EXIT_CODE from Semgrep"
+    MESSAGE="Unknown exit code $EXIT_CODE "
 fi
 
 END_TS=$(date +%s%3N)
