@@ -31,7 +31,3 @@ networks:
   default:
     name: "${DOCKER_NETWORK:-pipelinex-network}"
     internal: true
-
-
-
-
