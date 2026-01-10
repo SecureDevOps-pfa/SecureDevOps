@@ -11,7 +11,10 @@ REPORT_FILE="${REPORT_DIR}/result.json"
 APP_PORT="${APP_PORT:-8080}"
 TARGET_URL="http://app:${APP_PORT}"
 
-mkdir -p "${REPORT_DIR}"
+OUT_DIR="/zap/wrk"
+
+mkdir -p "${OUT_DIR}"
+cd "${OUT_DIR}"
 
 START_TS=$(date +%s%3N)
 
@@ -25,13 +28,13 @@ START_TS=$(date +%s%3N)
 #     -J dast.json \
 #     -r dast.html
 
-# assumes to be ran from docker-compose.dast.yml
+set +e
 zap-baseline.py \
   -t "${TARGET_URL}" \
-  -J dast.json \
-  -r dast.html
-
+  -J "dast.json" \
+  -r "dast.html"
 EXIT_CODE=$?
+set -e
 
 if [ $EXIT_CODE -eq 0 ]; then
     STATUS="SUCCESS"
@@ -50,7 +53,7 @@ fi
 END_TS=$(date +%s%3N)
 DURATION=$((END_TS - START_TS))
 
-cat > "${REPORT_FILE}" <<EOF
+cat > "result.json" <<EOF
 {
   "stage": "${STAGE}",
   "status": "${STATUS}",

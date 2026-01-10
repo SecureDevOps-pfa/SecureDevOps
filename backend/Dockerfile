@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
     docker.io \
+    docker-compose \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/backend
@@ -14,6 +15,9 @@ COPY backend/ .
 
 # Copy pipelines
 COPY pipelines/ /workspace/pipelines/
+
+# Copy runners
+COPY runners/ /workspace/runners/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt

@@ -1,10 +1,22 @@
 services:
   app:
-    image: abderrahmane03/pipelinex:java17-mvn3.9-latest
+    image: abderrahmane03/pipelinex:java17-mvn3.9.12-latest
     working_dir: /home/runner/app
     volumes:
-      - ./workspaces/${JOB_ID:-.}/app:/home/runner/app:rw
-    command: mvn spring-boot:run
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/source:/home/runner/app:rw
+    environment:
+      PORT: "${PORT:-8080}"
+    command: >
+      bash -lc '
+        JAR=$$(ls -1 target/*.jar 2>/dev/null | head -n 1 || true);
+        if [ -z "$$JAR" ]; then
+          echo "No jar found in target/. Did you run PACKAGE before DAST?";
+          ls -la target || true;
+          exit 1;
+        fi
+        echo "Starting app jar: $$JAR";
+        java -jar "$$JAR" --server.port=$$PORT;
+      '
     expose:
       - "${PORT:-8080}"
     healthcheck:
@@ -18,20 +30,18 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    working_dir: /home/runner
+    working_dir: /zap/wrk
     volumes:
-      - ./workspaces/${JOB_ID:-.}/reports:/home/runner/reports:rw
-      - ./workspaces/${JOB_ID:-.}/pipelines:/home/runner/pipelines:ro
+      # mount reports/dast to /zap/wrk
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/reports/dast:/zap/wrk:rw
+
+      # keep pipelines mounted so we can run dast.sh
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/pipelines:/workspaces/pipelines:ro
     environment:
       APP_PORT: "${PORT:-8080}"
-      REPORTS_DIR: /workspaces/reports
-    command: ["/bin/bash", "/workspaces/pipelines/dast.sh"]
+    command: ["/bin/bash", "/workspaces/pipelines/spring-boot-maven/dast.sh"]
 
 networks:
   default:
     name: "${DOCKER_NETWORK:-pipelinex-network}"
     internal: true
-
-
-
-

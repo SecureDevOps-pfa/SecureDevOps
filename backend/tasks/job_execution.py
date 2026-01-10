@@ -3,6 +3,8 @@ import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+import shutil
+from typing import Optional
 
 from celery_app import celery_app
 from config import WORKSPACES_DIR, HOST_WORKSPACES_PATH
@@ -235,60 +237,66 @@ def _run_stage(
         stage_report_dir.chmod(0o777)
     except:
         pass
+    
+    if stage == "DAST":
+        _run_dast_compose(job_dir=job_dir, job_id=job_id, metadata=metadata)
 
-    # Get the script to execute for this stage
-    stage_script = _resolve_stage_script(metadata, stage)
+        # Read result.json directly from filesystem (compose writes into workspace)
+        result_path = job_dir / "reports" / "dast" / "result.json"
+        if not result_path.exists():
+            raise RuntimeError("DAST did not produce reports/dast/result.json")
 
-    # Execute the stage script
-    # Note: We don't check=True because we want to read the result.json
-    # regardless of the script's exit code
-    subprocess.run(
-        [
-            "docker", "exec",
-            f"runner-{job_id}",
-            "bash", "-lc",
-            f'cd "$APP_DIR" && bash {stage_script}',
-        ],
-        check=False,
-    )
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+    else :
+        stage_script = _resolve_stage_script(metadata, stage)
 
-    # Special handling for SECRETS stage (normalize output location)
-    if stage == "SECRETS":
         subprocess.run(
             [
                 "docker", "exec",
                 f"runner-{job_id}",
                 "bash", "-lc",
-                (
-                    "mkdir -p $REPORTS_DIR/secrets && "
-                    "if [ -f $REPORTS_DIR/secrets-dir/result.json ]; then "
-                    "  mv $REPORTS_DIR/secrets-dir/* $REPORTS_DIR/secrets/ && "
-                    "  rmdir $REPORTS_DIR/secrets-dir; "
-                    "elif [ -f $REPORTS_DIR/secrets-git/result.json ]; then "
-                    "  mv $REPORTS_DIR/secrets-git/* $REPORTS_DIR/secrets/ && "
-                    "  rmdir $REPORTS_DIR/secrets-git; "
-                    "fi"
-                ),
+                f'cd "$APP_DIR" && bash {stage_script}',
             ],
-            check=True,
+            check=False,
         )
 
-    # Read the stage result
-    try:
-        raw = subprocess.check_output(
-            [
-                "docker", "exec", f"runner-{job_id}",
-                "bash", "-lc",
-                f"cat $REPORTS_DIR/{stage.lower()}/result.json",
-            ],
-            text=True,
-        )
-    except subprocess.CalledProcessError:
-        raise RuntimeError(
-            f"{stage} did not produce result.json in workspace reports directory"
-        )
+        # Special handling for SECRETS stage (normalize output location)
+        if stage == "SECRETS":
+            subprocess.run(
+                [
+                    "docker", "exec",
+                    f"runner-{job_id}",
+                    "bash", "-lc",
+                    (
+                        "mkdir -p $REPORTS_DIR/secrets && "
+                        "if [ -f $REPORTS_DIR/secrets-dir/result.json ]; then "
+                        "  mv $REPORTS_DIR/secrets-dir/* $REPORTS_DIR/secrets/ && "
+                        "  rmdir $REPORTS_DIR/secrets-dir; "
+                        "elif [ -f $REPORTS_DIR/secrets-git/result.json ]; then "
+                        "  mv $REPORTS_DIR/secrets-git/* $REPORTS_DIR/secrets/ && "
+                        "  rmdir $REPORTS_DIR/secrets-git; "
+                        "fi"
+                    ),
+                ],
+                check=True,
+            )
 
-    result = json.loads(raw)
+        # Read the stage result
+        try:
+            raw = subprocess.check_output(
+                [
+                    "docker", "exec", f"runner-{job_id}",
+                    "bash", "-lc",
+                    f"cat $REPORTS_DIR/{stage.lower()}/result.json",
+                ],
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            raise RuntimeError(
+                f"{stage} did not produce result.json in workspace reports directory"
+            )
+
+        result = json.loads(raw)
 
     # Handle stage success
     if result["status"] == "SUCCESS":
@@ -318,6 +326,76 @@ def _read_state(job_dir: Path) -> dict:
     """Read current state from state.json."""
     return json.loads((job_dir / "state.json").read_text())
 
+def _run_dast_compose(*, job_dir: Path, job_id: str, metadata: dict):
+    """
+    Runs runners/dast/docker-compose.dast.yml from the WORKER container using the host Docker daemon.
+    Expects compose to write:
+      job_dir/reports/dast/{dast.json,dast.html,result.json}
+    """
+    # 1) Copy compose file into job workspace root
+    src = _repo_root() / "runners" / "dast" / "docker-compose.dast.yml"
+    dst = job_dir / "docker-compose.dast.yml"
+
+    if not src.exists():
+        raise RuntimeError(f"DAST compose file not found: {src}")
+
+    shutil.copyfile(src, dst)
+
+    # 2) Compose env (per-job isolated network)
+    port = "8080"  # default (you can later make this configurable via metadata)
+    network = f"pipelinex-net-{job_id}"
+
+    env = os.environ.copy()
+    env["JOB_ID"] = job_id
+    env["PORT"] = port
+    env["DOCKER_NETWORK"] = network
+    env["HOST_WORKSPACES_PATH"] = HOST_WORKSPACES_PATH
+
+    compose_cmd = _docker_compose_base_cmd()
+
+    # 3) Up (stop when zap finishes, return zap exit code)
+    up_cmd = compose_cmd + [
+        "-f", str(dst),
+        "up",
+        "--abort-on-container-exit",
+        "--exit-code-from", "zap",
+    ]
+
+    # 4) Down (always)
+    down_cmd = compose_cmd + [
+        "-f", str(dst),
+        "down",
+        "-v",
+        "--remove-orphans",
+    ]
+
+    try:
+        # Run compose from job_dir so relative mounts in compose work correctly
+        subprocess.run(up_cmd, cwd=str(job_dir), env=env, check=False)
+    finally:
+        subprocess.run(down_cmd, cwd=str(job_dir), env=env, check=False)
+
+    # Make sure reports are readable (helpful when files are created by root in containers)
+    try:
+        (job_dir / "reports" / "dast").chmod(0o777)
+    except:
+        pass
+
+def _repo_root() -> Path:
+    # backend/tasks/job_execution.py -> parents[2] == repo root
+    return Path(__file__).resolve().parents[2]
+
+def _docker_compose_base_cmd() -> list[str]:
+    """
+    Prefer 'docker compose'. Fallback to 'docker-compose' if needed.
+    """
+    try:
+        subprocess.run(["docker", "compose", "version"], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return ["docker", "compose"]
+    except Exception:
+        # fallback (older setups)
+        return ["docker-compose"]
 
 def _resolve_stage_script(metadata: dict, stage: str) -> str:
     """Get the path to the script for a given stage."""
