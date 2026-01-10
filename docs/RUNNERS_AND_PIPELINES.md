@@ -144,9 +144,9 @@ The entire workspace is **owned by the runner user** and mounted into the contai
 ### Ownership & permissions
 > the workspaces are owned by the runner user/group and required permissions are granted 
 ```bash
-sudo chown -R 10001:10001 workdir/<job-id>
-sudo chmod -R u+rwx workdir/<job-id>
-sudo chmod +x workdir/<job-id>/pipelines/*.sh
+sudo chown -R 10001:10001 workspaces/<job-id>
+sudo chmod -R u+rwx workspaces/<job-id>
+sudo chmod +x workspaces/<job-id>/pipelines/*.sh
 ```
 
 ---
@@ -158,9 +158,9 @@ Command to start the runner container and mount the workspace:
 ```bash
 docker run --rm -it \
   -u 10001:10001 \
-  -v workdir/<job-id>/app:/home/runner/app:rw \
-  -v workdir/<job-id>/pipelines:/home/runner/pipelines:ro \
-  -v workdir/<job-id>/reports:/home/runner/reports:rw \
+  -v workspaces/<job-id>/app:/home/runner/app:rw \
+  -v workspaces/<job-id>/pipelines:/home/runner/pipelines:ro \
+  -v workspaces/<job-id>/reports:/home/runner/reports:rw \
   -w /home/runner \
   abderrahmane03/pipelinex:java17-mvn3.9.12-latest
 ```

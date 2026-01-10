@@ -3,7 +3,7 @@ services:
     image: abderrahmane03/pipelinex:java17-mvn3.9-latest
     working_dir: /home/runner/app
     volumes:
-      - ./workspaces/${JOB_ID:-local}/app:/home/runner/app:rw
+      - ./workspaces/${JOB_ID:-.}/app:/home/runner/app:rw
     command: mvn spring-boot:run
     expose:
       - "${PORT:-8080}"
@@ -20,8 +20,8 @@ services:
         condition: service_healthy
     working_dir: /home/runner
     volumes:
-      - ./workspaces/${JOB_ID:-local}/reports:/home/runner/reports:rw
-      - ./workspaces/${JOB_ID:-local}/pipelines:/home/runner/pipelines:ro
+      - ./workspaces/${JOB_ID:-.}/reports:/home/runner/reports:rw
+      - ./workspaces/${JOB_ID:-.}/pipelines:/home/runner/pipelines:ro
     environment:
       APP_PORT: "${PORT:-8080}"
       REPORTS_DIR: /workspaces/reports
@@ -30,6 +30,7 @@ services:
 networks:
   default:
     name: "${DOCKER_NETWORK:-pipelinex-network}"
+    internal: true
 
 
 
