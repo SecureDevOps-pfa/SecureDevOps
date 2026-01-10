@@ -2,144 +2,70 @@ basically the way owasp zap works is :
 - app is running on a known port (in our case app runnning inside the runner container)
 - owasp zap runs from its official docker image with that port as its target , it attacks the target and produces a json and an html (could be displayed in the frontend)
 - in our case we  will have both app and zap run  inside the same internal docker network `(per job network : pipelinex-net-<job_id>)` so the app is reachable while we remain isolated 
+- to simplify things , i created a docker compose to have them both on the same network with the correct volumes and  using docker dns to have zap correctly attack the app's path . 
+```yaml
+services:
+  app:
+    image: abderrahmane03/pipelinex:java17-mvn3.9-latest
+    working_dir: /workspaces/source
+    volumes:
+      - ./workspaces/${JOB_ID:-.}:/workspaces
+    command: mvn spring-boot:run
+    expose:
+      - "${PORT:-8080}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    depends_on:
+      app:
+        condition: service_healthy
+    working_dir: /workspaces
+    volumes:
+      - ./workspaces/${JOB_ID:-.}:/workspaces
+    environment:
+      APP_PORT: "${PORT:-8080}"
+      REPORTS_DIR: /workspaces/reports
+    command: ["/bin/bash", "/workspaces/pipelines/dast.sh"]
 
-### backend todos 
-
-#### important change : runners must use internal docker network from now on 
-- to have zap and app in  the same network the runner should be there too , creating a network is abackend task , using docker sdk this time , a function to create the network : 
-```python
-import docker
-from docker.errors import NotFound
-
-client = docker.from_env()
-
-def create_job_network(job_id: str) -> str:
-    network_name = f"pipelinex-net-{job_id}"
-    try:
-        client.networks.get(network_name) # Already exists (unlikely but safe)
-        return network_name
-    except NotFound:
-        client.networks.create(
-            name=network_name,
-            driver="bridge",
-            internal=True  # internal for more security
-        )
-        return network_name
-```
-and  to remove it when the job finishes : 
-```python
-def remove_job_network(network_name: str):
-    try:
-        network = client.networks.get(network_name)
-        network.remove()
-    except NotFound:
-        pass
-```
-
-- running the container with the docker network using docker sdk : 
-```python
-import docker
-client = docker.from_env()
-def run_runner_container(
-    job_id: str,
-    network_name: str,
-    workdir_base: str,
-    image: str = "abderrahmane03/pipelinex:java17-mvn3.9.12-latest",
-):
-    container = client.containers.run(
-        image=image,
-        name=f"runner-{job_id}",
-        user="10001:10001",
-        tty=True,
-        detach=True,
-        remove=True,  # equivalent to --rm
-        working_dir="/home/runner",
-        network=network_name,
-        volumes={
-            f"{workdir_base}/{job_id}/app": {
-                "bind": "/home/runner/app",
-                "mode": "rw",
-            },
-            f"{workdir_base}/{job_id}/pipelines": {
-                "bind": "/home/runner/pipelines",
-                "mode": "ro",
-            },
-            f"{workdir_base}/{job_id}/reports": {
-                "bind": "/home/runner/reports",
-                "mode": "rw",
-            },
-        },
-        environment={
-            "DOCKER_NETWORK": network_name,
-            # APP_PORT injected later if needed
-        },
-    )
-    return container
+networks:
+  default:
+    name: "${DOCKER_NETWORK:-pipelinex-network}"
 ```
 
-- the backend  will start the app ,wait until its up then runs dast.sh (start the app inside a docker network)
-- the backend will run mvn spring-boot:run , waits a certain amount of time  while checking if the app is up then after a certain  amount if not responsive assumes it corrupt and wont start dast , if not dast is started . 
-- if the pipeline already has smoke test enabled it would be ran before dast , if it succeed backend does not have to manually check app health before running dast , if smoke test fails dast will be skipped 
-- the port is defaulted to 8080 in spring boot's case , but is taken as a user input as well . 
+- the backend should copy this docker compose from runners/dast/docker-compose.dast.yml and add it in the root of workspace/job-id
+- then run docker compose -f docker-compose.dast.yml up after giving it the variables it expects
+    - JOB_ID
+    - PORT (will be defaulted to 8080 but the would be also taken in input from the user)
+    - DOCKER_NETWORK : defaul is pipelinex-network , the value given should be pipelinex-network-JOB_ID
+> [!WARNING]
+> The provided `docker-compose.yml` assumes a strict and consistent filesystem layout that matches the runner image contract.
 
-- 2 pruposed function to check the apps health 
-1. by me hhhh uses basic lsof -i :port ,  after a certain amount of time if port is taken then tomcat is up , seems good enough for me (99% wont work in windows)
-```python
-import subprocess
-import time
-def wait_for_port_lsof(port: int, timeout: int = 60) -> bool:
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            result = subprocess.run(
-                ["lsof", f"-i:{port}"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            )
-            if result.returncode == 0:
-                return True
-        except FileNotFoundError:
-            raise RuntimeError("lsof not available on system")
-        time.sleep(1)
-    return False
+- inside the runner container
+```bash
+/home/runner
+├── app/        # Spring Boot project (pom.xml, src/, target/)
+├── pipelines/  # Security scripts (sast.sh, sca.sh, dast.sh, etc.)
+└── reports/    # Output directory for all security stages
+```
+- dast.sh is  mounted  from /home/runner/pipelines/dast.sh and outputs are also on
+```bash
+/home/runner/reports/dast/
+├── dast.json    # Raw ZAP JSON output
+├── dast.html    # Human-readable HTML report
+└── result.json  # Pipeline summary (SUCCESS / WARN / ERROR)
 ```
 
-2. GPT hhh 
-```python
-import socket
-import time
+hopefully that should be it . 
 
-def wait_for_port_tcp(
-    host: str,
-    port: int,
-    timeout: int = 60,
-    interval: float = 1.0
-) -> bool:
-    """
-    Wait until a TCP connection to host:port succeeds.
-    Returns True if reachable, False on timeout.
-    """
-
-    end_time = time.time() + timeout
-
-    while time.time() < end_time:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(1)
-            try:
-                sock.connect((host, port))
-                return True
-            except (ConnectionRefusedError, socket.timeout, OSError):
-                pass
-
-        time.sleep(interval)
-
-    return False
-```
-- either way once the app is up just run the dast.sh and expect to get result.json dast.json and dast.html
-
-
-
-### dast notes (abderrahmane)
-- docker pull ghcr.io/zaproxy/zaproxy:sha256-563cb2a45bd7aa04ad972af0ab893fcf4cd657ed5fb3e4638fb504d19ee2af7c.att latest zap version available
+#### explaination of what happens : 
+- docker compose creates a docker internal network and registers both inside of it 
+- docker dns names the user inputed application app , so it is reachable inside the network from http://app:port 
+- the app service uses the runner then goes to source/ , runs `mvn spring-boot:run` , then does a health check 
+- zap container waits until app service is healthy then attacks it using dast.sh which is mounted , writing outputs to reports/dast 
+- zap outputs are result.json dast.json and dast.html , could be displayed in the future
+- in this iteration we are using zap baseline mode which takes less time and requires less config , full scan mode can be added in the future.
