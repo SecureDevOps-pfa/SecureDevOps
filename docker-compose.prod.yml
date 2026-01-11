@@ -1,30 +1,39 @@
 services:
   backend:
-    image: abderrahmane03/pipelinex:backend-latest
-    container_name: pipelinex-backend
-    volumes:
-      - workspaces:/workspaces
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - "8000:8000"
-    depends_on:
-      - redis
-
+  image: abderrahmane03/pipelinex:backend-latest
+  container_name: pipelinex-backend
+  volumes:
+    - ./workspaces:/workspaces
+    - /var/run/docker.sock:/var/run/docker.sock
+  ports:
+    - "8000:8000"
+  environment:
+    - HOST_WORKSPACES_PATH=${HOST_WORKSPACES_PATH}
+  depends_on:
+    init-workspaces:
+      condition: service_completed_successfully
+    redis:
+      condition: service_started
   worker:
-    image: abderrahmane03/pipelinex:backend-latest
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: pipelinex-worker
+    user: root 
     command: celery -A celery_app.celery_app worker --loglevel=info
     volumes:
-      - workspaces:/workspaces
+      - ./workspaces:/workspaces
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - HOST_WORKSPACES_PATH=${HOST_WORKSPACES_PATH}
     depends_on:
-      - redis
+      init-workspaces:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
 
   redis:
     image: redis:7-alpine
     container_name: pipelinex-redis
     ports:
       - "6379:6379"
-
-volumes:
-  workspaces:
