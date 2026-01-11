@@ -22,7 +22,9 @@ Content-Disposition: form-data; name="metadata"
     "run_unit_tests": true,
     "run_package": true,
     "run_smoke": true,
-    "run_dast": true
+    "run_dast": true,
+    "run_sast": true,
+    "run_sca": true
   }
 }
 --BOUNDARY
@@ -49,8 +51,15 @@ Content-Type: application/json
     "build_tool": "3.9"
   },
   "pipeline": {
+    "run_secret_scan": true,
+    "secret_scan_mode": "dir",
     "run_build": true,
+    "run_unit_tests": true,
     "run_package": true,
-    "run_dast": true
+    "run_smoke": true,
+    "run_dast": true,
+    "run_sast": true,
+    "run_sca": true
   }
 }
+
