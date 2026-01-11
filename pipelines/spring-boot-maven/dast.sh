@@ -44,7 +44,7 @@ elif [ $EXIT_CODE -eq 1 ]; then
     MESSAGE="Security findings detected"
 elif [ $EXIT_CODE -eq 2 ]; then
     STATUS="ERROR"
-    MESSAGE="ZAP execution error"
+    MESSAGE="Security findings detected"
 else
     STATUS="UNKNOWN"
     MESSAGE="Unknown exit code $EXIT_CODE"
