@@ -1,19 +1,32 @@
 services:
+  init-workspaces:
+    image: alpine:latest
+    container_name: pipelinex-init
+    user: root
+    volumes:
+      - ./workspaces:/workspaces
+    command: >
+      sh -c "
+      mkdir -p /workspaces &&
+      chmod -R 777 /workspaces &&
+      echo 'Workspace permissions initialized'
+      "
   backend:
-  image: abderrahmane03/pipelinex:backend-latest
-  container_name: pipelinex-backend
-  volumes:
-    - ./workspaces:/workspaces
-    - /var/run/docker.sock:/var/run/docker.sock
-  ports:
-    - "8000:8000"
-  environment:
-    - HOST_WORKSPACES_PATH=${HOST_WORKSPACES_PATH}
-  depends_on:
-    init-workspaces:
-      condition: service_completed_successfully
-    redis:
-      condition: service_started
+    image: abderrahmane03/pipelinex:backend-latest
+    container_name: pipelinex-backend
+    volumes:
+      - ./workspaces:/workspaces
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST_WORKSPACES_PATH=${HOST_WORKSPACES_PATH}
+    depends_on:
+      init-workspaces:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
   worker:
     build:
       context: .
