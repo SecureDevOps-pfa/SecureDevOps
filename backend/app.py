@@ -18,6 +18,7 @@ class Stack(BaseModel):
     language: str
     framework: str
     build_tool: str
+    requires_db: bool = False
 
 
 class Versions(BaseModel):

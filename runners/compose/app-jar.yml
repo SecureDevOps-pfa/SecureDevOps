@@ -1,0 +1,26 @@
+services:
+  app:
+    image: ${APP_IMAGE}
+    working_dir: /home/runner/app
+    volumes:
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/source:/home/runner/app:rw
+    environment:
+      PORT: "${PORT:-8080}"
+    command: >
+      bash -lc '
+        JAR=$$(ls -1 target/*.jar 2>/dev/null | head -n 1 || true);
+        if [ -z "$$JAR" ]; then
+          echo "No jar found in target/. Did you run PACKAGE before DAST?";
+          ls -la target || true;
+          exit 1;
+        fi
+        echo "Starting app jar: $$JAR";
+        java -jar "$$JAR" --server.port=$$PORT;
+      '
+    expose:
+      - "${PORT:-8080}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

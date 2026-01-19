@@ -238,13 +238,21 @@ def _run_stage(
     except:
         pass
     
-    if stage == "DAST":
-        _run_dast_compose(job_dir=job_dir, job_id=job_id, metadata=metadata)
+    topology = resolve_topology(stage, metadata)
 
-        # Read result.json directly from filesystem (compose writes into workspace)
-        result_path = job_dir / "reports" / "dast" / "result.json"
+    if needs_compose(topology):
+        _run_dynamic_compose(
+            job_dir=job_dir,
+            job_id=job_id,
+            metadata=metadata,
+            stage=stage,
+            topology=topology,
+        )
+
+        # DAST still produces result.json on filesystem
+        result_path = job_dir / "reports" / stage.lower() / "result.json"
         if not result_path.exists():
-            raise RuntimeError("DAST did not produce reports/dast/result.json")
+            raise RuntimeError(f"{stage} did not produce reports/{stage.lower()}/result.json")
 
         result = json.loads(result_path.read_text(encoding="utf-8"))
     else :
@@ -326,60 +334,84 @@ def _read_state(job_dir: Path) -> dict:
     """Read current state from state.json."""
     return json.loads((job_dir / "state.json").read_text())
 
-def _run_dast_compose(*, job_dir: Path, job_id: str, metadata: dict):
+def _run_dynamic_compose(
+    *,
+    job_dir: Path,
+    job_id: str,
+    metadata: dict,
+    stage: str,
+    topology: dict,
+):
     """
-    Runs runners/dast/docker-compose.dast.yml from the WORKER container using the host Docker daemon.
-    Expects compose to write:
-      job_dir/reports/dast/{dast.json,dast.html,result.json}
+    Runs a dynamically assembled docker-compose based on topology.
+    Currently supports:
+      - app
+      - app + db
+      - app + zap
+      - app + db + zap
     """
-    # 1) Copy compose file into job workspace root
-    src = _repo_root() / "runners" / "dast" / "docker-compose.dast.yml"
-    dst = job_dir / "docker-compose.dast.yml"
 
-    if not src.exists():
-        raise RuntimeError(f"DAST compose file not found: {src}")
+    compose_root = _repo_root() / "runners" / "compose"
+    if not compose_root.exists():
+        raise RuntimeError("compose templates directory not found")
 
-    shutil.copyfile(src, dst)
+    compose_files = select_compose_files(stage, topology)
 
-    # 2) Compose env (per-job isolated network)
-    port = "8080"  # default (you can later make this configurable via metadata)
+    # Copy compose fragments into job workspace
+    copied_files = []
+    for name in compose_files:
+        src = compose_root / name
+        if not src.exists():
+            raise RuntimeError(f"Compose fragment not found: {src}")
+
+        dst = job_dir / name
+        shutil.copyfile(src, dst)
+        copied_files.append(dst)
+
+    port = "8080"
     network = f"pipelinex-net-{job_id}"
 
     env = os.environ.copy()
-    env["JOB_ID"] = job_id
-    env["PORT"] = port
-    env["DOCKER_NETWORK"] = network
-    env["HOST_WORKSPACES_PATH"] = HOST_WORKSPACES_PATH
+    env.update({
+        "JOB_ID": job_id,
+        "PORT": port,
+        "DOCKER_NETWORK": network,
+        "HOST_WORKSPACES_PATH": HOST_WORKSPACES_PATH,
+        "APP_IMAGE": _select_runner_image(metadata),
+    })
 
     compose_cmd = _docker_compose_base_cmd()
 
-    # 3) Up (stop when zap finishes, return zap exit code)
-    up_cmd = compose_cmd + [
-        "-f", str(dst),
+    up_cmd = compose_cmd + sum(
+        [["-f", str(f)] for f in copied_files],
+        []
+    ) + [
         "up",
         "--abort-on-container-exit",
-        "--exit-code-from", "zap",
+        "--exit-code-from", "zap" if topology["zap"] else "app",
     ]
 
-    # 4) Down (always)
-    down_cmd = compose_cmd + [
-        "-f", str(dst),
+    down_cmd = compose_cmd + sum(
+        [["-f", str(f)] for f in copied_files],
+        []
+    ) + [
         "down",
         "-v",
         "--remove-orphans",
     ]
 
     try:
-        # Run compose from job_dir so relative mounts in compose work correctly
         subprocess.run(up_cmd, cwd=str(job_dir), env=env, check=False)
     finally:
         subprocess.run(down_cmd, cwd=str(job_dir), env=env, check=False)
 
-    # Make sure reports are readable (helpful when files are created by root in containers)
-    try:
-        (job_dir / "reports" / "dast").chmod(0o777)
-    except:
-        pass
+    # Ensure report permissions
+    report_dir = job_dir / "reports" / stage.lower()
+    if report_dir.exists():
+        try:
+            report_dir.chmod(0o777)
+        except:
+            pass
 
 def _repo_root() -> Path:
     # backend/tasks/job_execution.py -> parents[2] == repo root
@@ -450,3 +482,50 @@ def _stop_runner_container(job_id: str):
         ["docker", "rm", "-f", f"runner-{job_id}"],
         check=False,
     )
+
+def resolve_topology(stage: str, metadata: dict) -> dict:
+    """
+    Returns which services are required for this stage.
+    """
+    topology = {
+        "app": True,
+        "db": False,
+        "zap": False,
+    }
+
+    if stage == "SMOKE-TEST":
+        topology["db"] = metadata.get("stack", {}).get("requires_db", False)
+
+    if stage == "DAST":
+        topology["zap"] = True
+        topology["db"] = metadata.get("stack", {}).get("requires_db", False)
+
+    if topology["zap"] and not topology["app"]:
+        raise RuntimeError("Invalid topology: zap requires app")
+
+    if topology["db"] and not topology["app"]:
+        raise RuntimeError("Invalid topology: db requires app")
+
+    return topology
+
+def needs_compose(topology: dict) -> bool:
+    return topology["db"] or topology["zap"]
+
+def select_compose_files(stage: str, topology: dict) -> list[str]:
+    files = ["base.yml"]
+
+    if stage == "DAST":
+        files.append("app-jar.yml")
+    else:
+        files.append("app-runner.yml")
+
+    if topology["db"]:
+        files.extend(["db.yml", "app-db.yml"])
+
+    if topology["zap"]:
+        files.extend(["zap.yml", "app-zap.yml"])
+
+    if topology["db"] and topology["zap"]:
+        files.append("app-db-zap.yml")
+
+    return files

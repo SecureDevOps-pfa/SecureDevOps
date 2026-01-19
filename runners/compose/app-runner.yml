@@ -1,0 +1,6 @@
+services:
+  app:
+    image: ${APP_IMAGE}
+    working_dir: /home/runner/app
+    volumes:
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/source:/home/runner/app:rw

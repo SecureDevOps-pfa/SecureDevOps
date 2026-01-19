@@ -1,0 +1,13 @@
+services:
+  db:
+    image: "${DB_IMAGE}"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:${DB_DRIVER}://db:${DB_PORT}/${DB_NAME}"
+      POSTGRES_DB: "${DB_NAME}"
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z db ${DB_PORT:-5432}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

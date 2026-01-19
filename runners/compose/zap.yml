@@ -1,0 +1,13 @@
+services:
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    depends_on:
+      app:
+        condition: service_healthy
+    working_dir: /zap/wrk
+    volumes:
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/reports/dast:/zap/wrk:rw
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/pipelines:/workspaces/pipelines:ro
+    environment:
+      APP_PORT: "${PORT:-8080}"
+    command: ["/bin/bash", "/workspaces/pipelines/spring-boot-maven/dast.sh"]

@@ -44,7 +44,8 @@ Content-Type: application/json
   "stack": {
     "language": "java",
     "framework": "spring-boot",
-    "build_tool": "maven"
+    "build_tool": "maven",
+    "requires_db": false
   },
   "versions": {
     "java": "17",
