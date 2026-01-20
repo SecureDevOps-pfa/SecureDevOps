@@ -14,9 +14,45 @@ TARGET_URL="http://app:${APP_PORT}"
 OUT_DIR="/zap/wrk"
 
 mkdir -p "${OUT_DIR}"
+mkdir -p "${REPORT_DIR}"
 cd "${OUT_DIR}"
 
 START_TS=$(date +%s%3N)
+
+# ---- GUARANTEE result.json EVEN IF SCRIPT FAILS ----
+trap '{
+  END_TS=$(date +%s%3N)
+  DURATION=$((END_TS - START_TS))
+  cat > "${REPORT_FILE}" <<EOF
+{
+  "stage": "${STAGE}",
+  "status": "FAILED",
+  "duration_ms": ${DURATION},
+  "message": "DAST aborted before completion"
+}
+EOF
+}' ERR EXIT
+
+# ---- WAIT FOR APP (REQUIRED WHEN DB IS ENABLED) ----
+READY=false
+for i in $(seq 1 20); do
+  if curl -fs "${TARGET_URL}/actuator/health" >/dev/null 2>&1; then
+    READY=true
+    break
+  fi
+  sleep 3
+done
+
+if [ "$READY" != "true" ]; then
+  cat > "${REPORT_FILE}" <<EOF
+{
+  "stage": "${STAGE}",
+  "status": "FAILED",
+  "message": "Application not reachable before DAST"
+}
+EOF
+  exit 1
+fi
 
 #raw command, ill keep it for now . 
 # docker run --rm \

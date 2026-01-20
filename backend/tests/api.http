@@ -10,15 +10,7 @@ Content-Disposition: form-data; name="metadata"
     "language": "java",
     "framework": "spring-boot",
     "build_tool": "maven",
-    "requires_db": true
-  },
-  "database": {
-    "image": "postgres:15",
-    "name": "db_uaa",
-    "user": "postgres",
-    "password": "postgres",
-    "port": 5432,
-    "driver": "postgresql"
+    "requires_db": false
   },
   "versions": {
     "java": "17",
@@ -27,7 +19,8 @@ Content-Disposition: form-data; name="metadata"
   "pipeline": {
     "run_build": true,
     "run_package": true,
-    "run_smoke": true
+    "run_smoke": true,
+    "run_dast": true
   }
 }
 --BOUNDARY

@@ -23,7 +23,7 @@ services:
     expose:
       - "${PORT:-8080}"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:${PORT:-8080}/actuator/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 12
