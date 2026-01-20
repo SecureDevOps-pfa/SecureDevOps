@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -Euo pipefail
 
 REPORTS_DIR="${REPORTS_DIR:-../reports}"
-APP_DIR="${APP_DIR:-../source}"
+APP_DIR="${APP_DIR:-.}"
 
 STAGE="smoke-test"
 
@@ -13,6 +13,20 @@ LOG_FILE="${REPORT_DIR}/${STAGE}.log"
 mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
+
+# ---- GUARANTEE RESULT.JSON EVEN ON CRASH ----
+trap '{
+  END_TS=$(date +%s%3N)
+  DURATION=$((END_TS - START_TS))
+  cat > "${REPORT_FILE}" <<EOF
+{
+  "stage": "${STAGE}",
+  "status": "FAILED",
+  "duration_ms": ${DURATION},
+  "message": "Smoke-test script crashed before completion"
+}
+EOF
+}' ERR
 
 JAR_FILE=$(ls "${APP_DIR}/target/"*.jar 2>/dev/null | head -n 1)
 
@@ -47,6 +61,20 @@ done
 
 echo "Stopping app..."
 kill "$APP_PID" >/dev/null 2>&1 || true
+# Give JVM time to exit cleanly
+for i in $(seq 1 10); do
+  if ps -p "$APP_PID" > /dev/null; then
+    sleep 1
+  else
+    break
+  fi
+done
+
+# Force kill if still alive
+if ps -p "$APP_PID" > /dev/null; then
+  echo "Force killing app..."
+  kill -9 "$APP_PID" >/dev/null 2>&1 || true
+fi
 wait "$APP_PID" 2>/dev/null || true
 
 END_TS=$(date +%s%3N)

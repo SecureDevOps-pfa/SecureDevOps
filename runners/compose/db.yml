@@ -1,13 +1,14 @@
 services:
   db:
-    image: "${DB_IMAGE}"
+    image: ${DB_IMAGE}
     environment:
-      SPRING_DATASOURCE_URL: "jdbc:${DB_DRIVER}://db:${DB_PORT}/${DB_NAME}"
-      POSTGRES_DB: "${DB_NAME}"
-      POSTGRES_USER: "${DB_USER}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "nc -z db ${DB_PORT:-5432}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 3s
       retries: 12
+      start_period: 20s
+

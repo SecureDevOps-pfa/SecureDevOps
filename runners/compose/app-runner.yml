@@ -4,3 +4,17 @@ services:
     working_dir: /home/runner/app
     volumes:
       - ${HOST_WORKSPACES_PATH}/${JOB_ID}/source:/home/runner/app:rw
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/reports:/home/runner/reports:rw
+      - ${HOST_WORKSPACES_PATH}/${JOB_ID}/pipelines:/home/runner/pipelines:ro
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:${DB_DRIVER}://db:${DB_PORT}/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+    command:
+      - /bin/bash
+      - -lc
+      - |
+        echo "[APP] SCRIPT=$SCRIPT"
+        test -x "$SCRIPT"
+        exec bash "$SCRIPT"
+

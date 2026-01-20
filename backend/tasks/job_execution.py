@@ -372,6 +372,26 @@ def _run_dynamic_compose(
     network = f"pipelinex-net-{job_id}"
 
     env = os.environ.copy()
+    
+    # ------------------------------------------------------------------
+    # Inject database configuration (if required)
+    # ------------------------------------------------------------------
+    if topology.get("db"):
+        db = metadata.get("database")
+        if not db:
+            raise RuntimeError(
+                "Topology requires database but no database configuration found in metadata"
+            )
+
+        env.update({
+            "DB_IMAGE": db.get("image", "postgres:15"),
+            "DB_NAME": db.get("name", "app"),
+            "DB_USER": db.get("user", "postgres"),
+            "DB_PASSWORD": db.get("password", "postgres"),
+            "DB_PORT": str(db.get("port", 5432)),
+            "DB_DRIVER": db.get("driver", "postgresql"),
+        })
+
     env.update({
         "JOB_ID": job_id,
         "PORT": port,
@@ -379,6 +399,10 @@ def _run_dynamic_compose(
         "HOST_WORKSPACES_PATH": HOST_WORKSPACES_PATH,
         "APP_IMAGE": _select_runner_image(metadata),
     })
+
+    # Inject SCRIPT for app-runner based stages
+    if stage != "DAST":
+        env["SCRIPT"] = f"/home/runner/pipelines/{_resolve_pipeline_dir(metadata)}/{stage.lower()}.sh"
 
     compose_cmd = _docker_compose_base_cmd()
 

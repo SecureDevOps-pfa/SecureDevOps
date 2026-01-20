@@ -14,6 +14,9 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
+rm -rf "${APP_DIR}/target" || true
+sync
+
 if mvn -f "${APP_DIR}/pom.xml" -DskipTests clean compile \
      -B -ntp \
      >"$LOG_FILE" 2>&1; then

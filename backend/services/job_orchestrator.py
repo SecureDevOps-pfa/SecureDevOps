@@ -23,6 +23,7 @@ class JobOrchestrator:
                 stack=metadata["stack"],
                 versions=metadata.get("versions", {}),
                 pipeline=metadata["pipeline"],
+                database=metadata.get("database"),
             )
             
             framework = "spring-boot-maven"  # hardcoded for now
@@ -59,6 +60,7 @@ class JobOrchestrator:
                 stack=metadata["stack"],
                 versions=metadata.get("versions", {}),
                 pipeline=metadata["pipeline"],
+                database=metadata.get("database"),
             )
 
             framework = "spring-boot-maven"  # hardcoded for now

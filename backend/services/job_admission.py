@@ -12,6 +12,7 @@ def admit_job(
     stack: dict,
     versions: dict,
     pipeline: dict,
+    database: dict | None = None,
 ):
     if (
         pipeline.get("run_secret_scan")
@@ -36,6 +37,7 @@ def admit_job(
         "stack": stack,
         "versions": versions,
         "pipeline": pipeline,
+        "database": database, 
         "warnings": validation.warnings,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }

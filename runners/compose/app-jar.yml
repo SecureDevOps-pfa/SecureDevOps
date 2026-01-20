@@ -6,6 +6,9 @@ services:
       - ${HOST_WORKSPACES_PATH}/${JOB_ID}/source:/home/runner/app:rw
     environment:
       PORT: "${PORT:-8080}"
+      SPRING_DATASOURCE_URL: jdbc:${DB_DRIVER}://db:${DB_PORT}/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
     command: >
       bash -lc '
         JAR=$$(ls -1 target/*.jar 2>/dev/null | head -n 1 || true);
