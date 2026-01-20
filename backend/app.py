@@ -37,20 +37,11 @@ class Pipeline(BaseModel):
     run_smoke: bool = False
     run_dast: bool = False
 
-class Database(BaseModel):
-    image: str
-    name: str
-    user: str
-    password: str
-    port: int
-    driver: Literal["postgresql"]
-
 class GitHubJobRequest(BaseModel):
     github_url: str
     stack: Stack
     versions: Versions
     pipeline: Pipeline
-    database: Database | None = None
 
 
 # ---------- Endpoints ----------

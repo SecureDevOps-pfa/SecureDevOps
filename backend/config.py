@@ -12,3 +12,12 @@ MAX_DEPTH = 25
 
 GIT_CLONE_TIMEOUT = 60          # seconds
 GIT_MAX_DEPTH = 1               # shallow clone
+
+DEFAULT_DATABASE_CONFIG = {
+    "image": "postgres:15",
+    "name": "app_db",
+    "user": "postgres",
+    "password": "postgres",
+    "port": 5432,
+    "driver": "postgresql"
+}

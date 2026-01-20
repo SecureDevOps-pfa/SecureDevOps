@@ -4,7 +4,7 @@ from services.repo_input_service import clone_github_repository
 from services.job_admission import admit_job
 from services.pipeline_installer import install_pipelines
 from tasks.job_execution import execute_job
-
+from config import DEFAULT_DATABASE_CONFIG
 
 class JobOrchestrator:
     """
@@ -12,18 +12,32 @@ class JobOrchestrator:
     Workspace lifecycle is delegated to workspace_service.
     """
 
+    def _inject_database_config(self, metadata: dict) -> dict:
+        """
+        Inject static database configuration if the stack requires a DB.
+        """
+        stack = metadata.get("stack", {})
+
+        if stack.get("requires_db"):
+            metadata["database"] = DEFAULT_DATABASE_CONFIG.copy()
+        else:
+            metadata["database"] = None
+
+        return metadata
+
     def create_job_from_zip_input(self, *, file, metadata: dict):
         workspace = None
 
         try:
             workspace = handle_zip_input(file)
 
+            metadata = self._inject_database_config(metadata)
             job_metadata = admit_job(
                 workspace=workspace,
                 stack=metadata["stack"],
                 versions=metadata.get("versions", {}),
                 pipeline=metadata["pipeline"],
-                database=metadata.get("database"),
+                database=metadata["database"],
             )
             
             framework = "spring-boot-maven"  # hardcoded for now
@@ -55,12 +69,13 @@ class JobOrchestrator:
                 full_history=full_history,
             )
 
+            metadata = self._inject_database_config(metadata)
             job_metadata = admit_job(
                 workspace=workspace,
                 stack=metadata["stack"],
                 versions=metadata.get("versions", {}),
                 pipeline=metadata["pipeline"],
-                database=metadata.get("database"),
+                database=metadata["database"],
             )
 
             framework = "spring-boot-maven"  # hardcoded for now
