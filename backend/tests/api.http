@@ -60,3 +60,7 @@ Content-Type: application/json
   }
 }
 
+
+### Get job status
+GET http://127.0.0.1:8000/api/jobs/job-001/status
+Accept: application/json

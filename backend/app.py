@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from typing import Literal
 from pydantic import BaseModel
 import json
-
+from config import WORKSPACES_DIR
 from services.job_orchestrator import JobOrchestrator
 
 app = FastAPI(
@@ -73,6 +73,71 @@ async def create_job_from_github(payload: GitHubJobRequest):
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/jobs/{job_id}/status")
+def get_job_status(job_id: str):
+    job_dir = WORKSPACES_DIR / job_id
+
+    # --------------------------------------------------
+    # 1. Validate job exists
+    # --------------------------------------------------
+    if not job_dir.exists() or not job_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    metadata_path = job_dir / "metadata.json"
+    if not metadata_path.exists():
+        # This should never happen for an accepted job
+        raise HTTPException(
+            status_code=500,
+            detail="Job metadata missing or corrupted"
+        )
+
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+    state_path = job_dir / "state.json"
+
+    # --------------------------------------------------
+    # 2. Job still QUEUED (state.json not yet created)
+    # --------------------------------------------------
+    if not state_path.exists():
+        return {
+            **metadata,
+            "execution": {
+                "state": "QUEUED",
+                "current_stage": None,
+                "stages": {
+                    stage: {
+                        "status": "PENDING" if enabled else "SKIPPED"
+                    }
+                    for stage, enabled in (
+                        (stage, metadata["pipeline"].get(flag, False))
+                        for flag, stage in [
+                            ("run_secret_scan", "SECRETS"),
+                            ("run_build", "BUILD"),
+                            ("run_unit_tests", "TEST"),
+                            ("run_sast", "SAST"),
+                            ("run_sca", "SCA"),
+                            ("run_package", "PACKAGE"),
+                            ("run_smoke", "SMOKE-TEST"),
+                            ("run_dast", "DAST"),
+                        ]
+                    )
+                },
+                "updated_at": metadata.get("created_at"),
+                "warnings": {},
+            },
+        }
+
+    # --------------------------------------------------
+    # 3. Job RUNNING / FINISHED
+    # --------------------------------------------------
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+
+    return {
+        **metadata,
+        "execution": state,
+    }
 
 
 # Swagger UI
