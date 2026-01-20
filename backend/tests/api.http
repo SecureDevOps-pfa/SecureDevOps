@@ -10,7 +10,7 @@ Content-Disposition: form-data; name="metadata"
     "language": "java",
     "framework": "spring-boot",
     "build_tool": "maven",
-    "requires_db": true
+    "requires_db": false
   },
   "versions": {
     "java": "17",
@@ -53,7 +53,12 @@ Content-Type: application/json
     "build_tool": "3.9"
   },
   "pipeline": {
+    "run_secret_scan": true,
+    "secret_scan_mode": "dir",
     "run_build": true,
+    "run_unit_tests": true,
+    "run_sast": true,
+    "run_sca": true,
     "run_package": true,
     "run_smoke": true,
     "run_dast": true

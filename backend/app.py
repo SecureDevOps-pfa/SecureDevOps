@@ -87,56 +87,75 @@ def get_job_status(job_id: str):
 
     metadata_path = job_dir / "metadata.json"
     if not metadata_path.exists():
-        # This should never happen for an accepted job
         raise HTTPException(
             status_code=500,
             detail="Job metadata missing or corrupted"
         )
 
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-
     state_path = job_dir / "state.json"
 
     # --------------------------------------------------
-    # 2. Job still QUEUED (state.json not yet created)
+    # 2. Build static job block
+    # --------------------------------------------------
+    job_block = {
+        "id": metadata.get("job_id"),
+        "admission_status": metadata.get("status"),
+        "created_at": metadata.get("created_at"),
+        "stack": metadata.get("stack"),
+        "versions": metadata.get("versions"),
+    }
+
+    # --------------------------------------------------
+    # 3. Job still QUEUED (state.json not yet created)
     # --------------------------------------------------
     if not state_path.exists():
+        stages = {}
+        pipeline = metadata.get("pipeline", {})
+
+        stage_map = [
+            ("run_secret_scan", "SECRETS"),
+            ("run_build", "BUILD"),
+            ("run_unit_tests", "TEST"),
+            ("run_sast", "SAST"),
+            ("run_sca", "SCA"),
+            ("run_package", "PACKAGE"),
+            ("run_smoke", "SMOKE-TEST"),
+            ("run_dast", "DAST"),
+        ]
+
+        for flag, stage in stage_map:
+            stages[stage] = {
+                "status": "PENDING" if pipeline.get(flag, False) else "SKIPPED"
+            }
+
         return {
-            **metadata,
+            "job": job_block,
             "execution": {
                 "state": "QUEUED",
                 "current_stage": None,
-                "stages": {
-                    stage: {
-                        "status": "PENDING" if enabled else "SKIPPED"
-                    }
-                    for stage, enabled in (
-                        (stage, metadata["pipeline"].get(flag, False))
-                        for flag, stage in [
-                            ("run_secret_scan", "SECRETS"),
-                            ("run_build", "BUILD"),
-                            ("run_unit_tests", "TEST"),
-                            ("run_sast", "SAST"),
-                            ("run_sca", "SCA"),
-                            ("run_package", "PACKAGE"),
-                            ("run_smoke", "SMOKE-TEST"),
-                            ("run_dast", "DAST"),
-                        ]
-                    )
-                },
                 "updated_at": metadata.get("created_at"),
+                "stages": stages,
                 "warnings": {},
             },
         }
 
     # --------------------------------------------------
-    # 3. Job RUNNING / FINISHED
+    # 4. Job RUNNING / FINISHED
     # --------------------------------------------------
     state = json.loads(state_path.read_text(encoding="utf-8"))
 
+    execution_block = {
+        "state": state.get("state"),
+        "current_stage": state.get("current_stage"),
+        "updated_at": state.get("updated_at"),
+        "stages": state.get("stages", {}),
+        "warnings": state.get("warnings", {}),
+    }
+
     return {
-        **metadata,
-        "execution": state,
+        "job": job_block,
+        "execution": execution_block,
     }
 
 
