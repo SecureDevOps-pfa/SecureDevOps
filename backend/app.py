@@ -4,6 +4,10 @@ from pydantic import BaseModel
 import json
 from config import WORKSPACES_DIR
 from services.job_orchestrator import JobOrchestrator
+from fastapi.responses import FileResponse
+import zipfile
+import tempfile
+
 
 app = FastAPI(
     title="Secure DevSecOps Pipeline",
@@ -158,6 +162,67 @@ def get_job_status(job_id: str):
         "execution": execution_block,
     }
 
+
+@app.get("/api/jobs/{job_id}/reports")
+def download_job_reports(job_id: str):
+    job_dir = WORKSPACES_DIR / job_id
+
+    # --------------------------------------------------
+    # 1. Validate job exists
+    # --------------------------------------------------
+    if not job_dir.exists() or not job_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    metadata_path = job_dir / "metadata.json"
+    state_path = job_dir / "state.json"
+    reports_dir = job_dir / "reports"
+
+    if not metadata_path.exists():
+        raise HTTPException(status_code=500, detail="Job metadata missing")
+
+    if not state_path.exists():
+        raise HTTPException(
+            status_code=409,
+            detail="Job has not started yet"
+        )
+
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+
+    # --------------------------------------------------
+    # 2. Ensure job is finished
+    # --------------------------------------------------
+    if state.get("state") not in {"SUCCEEDED", "FAILED"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Job is still running"
+        )
+
+    if not reports_dir.exists() or not reports_dir.is_dir():
+        raise HTTPException(
+            status_code=404,
+            detail="No reports available for this job"
+        )
+
+    # --------------------------------------------------
+    # 3. Create ZIP archive (temp)
+    # --------------------------------------------------
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+        zip_path = tmp.name
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for file_path in reports_dir.rglob("*"):
+            if file_path.is_file():
+                arcname = file_path.relative_to(reports_dir)
+                zipf.write(file_path, arcname)
+
+    # --------------------------------------------------
+    # 4. Return ZIP file
+    # --------------------------------------------------
+    return FileResponse(
+        zip_path,
+        media_type="application/zip",
+        filename=f"{job_id}-reports.zip",
+    )
 
 # Swagger UI
 # http://127.0.0.1:8000/docs
