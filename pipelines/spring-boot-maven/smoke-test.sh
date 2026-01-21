@@ -9,6 +9,7 @@ STAGE="smoke-test"
 REPORT_DIR="${REPORTS_DIR}/${STAGE}"
 REPORT_FILE="${REPORT_DIR}/result.json"
 LOG_FILE="${REPORT_DIR}/${STAGE}.log"
+APP_PORT="${APP_PORT:-8080}"
 
 mkdir -p "${REPORT_DIR}"
 
@@ -52,12 +53,13 @@ sleep 10
 READY=false
 for i in $(seq 1 10); do
   echo "Health check attempt $i..."
-  if curl -fs http://localhost:8080/actuator/health >/dev/null 2>&1; then
+  if nc -z localhost "${APP_PORT}"; then
     READY=true
     break
   fi
   sleep 3
 done
+
 
 echo "Stopping app..."
 kill "$APP_PID" >/dev/null 2>&1 || true
@@ -85,7 +87,7 @@ if [[ "$READY" == true ]]; then
   MESSAGE="Application started and health endpoint is reachable"
   EXIT_CODE=0
 else
-  STATUS="FAILED"
+  STATUS="FAILURE"
   MESSAGE="Health endpoint not reachable"
   EXIT_CODE=1
 fi

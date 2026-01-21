@@ -21,7 +21,7 @@ if mvn -f "${APP_DIR}/pom.xml" -DskipTests clean compile \
      -B -ntp \
      >"$LOG_FILE" 2>&1; then
   STATUS="SUCCESS"
-  MESSAGE="Compilation succeeded"
+  MESSAGE="${STAGE} stage succeeded"
   EXIT_CODE=0
 else
   STATUS="FAILED"

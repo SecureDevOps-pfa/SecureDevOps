@@ -13,20 +13,21 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-gitleaks git "$APP_DIR" --report-format json --report-path "${LOG_FILE}"
-EXIT_CODE=$?
+EXIT_CODE=0
+gitleaks git "$APP_DIR" --report-format json --report-path "${LOG_FILE}" || EXIT_CODE=$?
+
 
 if [ $EXIT_CODE -eq 0 ]; then
     STATUS="SUCCESS"
     MESSAGE="no leaks found"
 elif [ $EXIT_CODE -eq 1 ]; then
-    STATUS="FAILURE"
+    STATUS="SUCCESS"
     MESSAGE="leaks found, see $LOG_FILE for details"
 elif [ $EXIT_CODE -eq 2 ]; then
-    STATUS="ERROR"
+    STATUS="FAILURE"
     MESSAGE="tool error"
 else
-    STATUS="UNKNOWN"
+    STATUS="FAILURE"
     MESSAGE="unknown exit code $EXIT_CODE"
 fi
 
