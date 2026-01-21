@@ -52,8 +52,8 @@ sleep 10
 
 READY=false
 for i in $(seq 1 10); do
-  echo "Health check attempt $i..."
-  if nc -z localhost "${APP_PORT}"; then
+  echo "Port check attempt $i..."
+  if bash -c "</dev/tcp/localhost/${APP_PORT}" 2>/dev/null; then
     READY=true
     break
   fi
@@ -87,7 +87,7 @@ if [[ "$READY" == true ]]; then
   MESSAGE="Application started and health endpoint is reachable"
   EXIT_CODE=0
 else
-  STATUS="FAILURE"
+  STATUS="FAILED"
   MESSAGE="Health endpoint not reachable"
   EXIT_CODE=1
 fi

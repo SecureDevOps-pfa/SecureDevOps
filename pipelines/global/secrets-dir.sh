@@ -24,10 +24,10 @@ elif [ $EXIT_CODE -eq 1 ]; then
     STATUS="SUCCESS"
     MESSAGE="leaks found, see $LOG_FILE for details"
 elif [ $EXIT_CODE -eq 2 ]; then
-    STATUS="FAILURE"
+    STATUS="FAILED"
     MESSAGE="tool error"
 else
-    STATUS="FAILURE"
+    STATUS="FAILED"
     MESSAGE="unknown exit code $EXIT_CODE"
 fi
 
