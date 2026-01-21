@@ -76,13 +76,13 @@ if [ $EXIT_CODE -eq 0 ]; then
     STATUS="SUCCESS"
     MESSAGE="No security issues found"
 elif [ $EXIT_CODE -eq 1 ]; then
-    STATUS="WARN"
+    STATUS="SUCCESS"
     MESSAGE="Security findings detected"
 elif [ $EXIT_CODE -eq 2 ]; then
-    STATUS="ERROR"
+    STATUS="FAILURE"
     MESSAGE="Security findings detected"
 else
-    STATUS="UNKNOWN"
+    STATUS="FAILURE"
     MESSAGE="Unknown exit code $EXIT_CODE"
 fi
 

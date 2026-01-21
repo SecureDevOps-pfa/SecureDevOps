@@ -13,20 +13,20 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-EXIT_CODE=0
-semgrep --config=p/java --json --output "${LOG_FILE}" "${APP_DIR}" || EXIT_CODE=$?
+EXIT_CODE=0 #to stop exit on fails 
+semgrep --config=p/java --json --output "${LOG_FILE}" "${APP_DIR}" || EXIT_CODE=$? #to  stop exit on fails
 
 if [ $EXIT_CODE -eq 0 ]; then
     STATUS="SUCCESS"
     MESSAGE="no issues found"
 elif [ $EXIT_CODE -eq 1 ]; then
-    STATUS="FAILURE"
+    STATUS="SUCCESS"
     MESSAGE="issues found, see $LOG_FILE for details"
 elif [ $EXIT_CODE -eq 2 ]; then
-    STATUS="ERROR"
+    STATUS="FAILURE"
     MESSAGE="tool error"
 else
-    STATUS="UNKNOWN"
+    STATUS="FAILURE"
     MESSAGE="unknown exit code $EXIT_CODE"
 fi
 

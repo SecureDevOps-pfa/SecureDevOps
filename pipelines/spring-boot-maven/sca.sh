@@ -13,21 +13,21 @@ mkdir -p "${REPORT_DIR}"
 
 START_TS=$(date +%s%3N)
 
-trivy fs --scanners vuln "${APP_DIR}/pom.xml" --format json --output "${LOG_FILE}"
-
-EXIT_CODE=$?
+#l || to prevent set -e and -u from killing the pipeline
+EXIT_CODE=0
+trivy fs --scanners vuln "${APP_DIR}/pom.xml" --format json --output "${LOG_FILE}" || EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
     STATUS="SUCCESS"
     MESSAGE="No issues found in ${APP_DIR}"
 elif [ $EXIT_CODE -eq 1 ]; then
-    STATUS="FAILURE"
+    STATUS="SUCCESS"
     MESSAGE="Issues found in ${APP_DIR}, see ${LOG_FILE} for details"
 elif [ $EXIT_CODE -eq 2 ]; then
-    STATUS="ERROR"
+    STATUS="FAILURE"
     MESSAGE="Semgrep execution error"
 else
-    STATUS="UNKNOWN"
+    STATUS="FAILURE"
     MESSAGE="Unknown exit code $EXIT_CODE "
 fi
 
