@@ -233,6 +233,90 @@ def download_job_reports(job_id: str):
         filename=f"{job_id}-reports.zip",
     )
 
+STAGE_LOG_FILES = {
+    "SECRETS": ["secrets-dir.json", "secrets-git.json"],
+    "BUILD": ["build.log"],
+    "TEST": ["test.log"],
+    "SAST": ["sast.json"],
+    "SCA": ["sca.json"],
+    "PACKAGE": ["package.log"],
+    "SMOKE-TEST": ["smoke-test.log"],
+    "DAST": ["dast.json"],
+}
+
+@app.get("/api/jobs/{job_id}/{stage}/logs")
+def get_stage_logs(job_id: str, stage: str):
+    stage = stage.upper()
+    job_dir = WORKSPACES_DIR / job_id
+
+    # --------------------------------------------------
+    # 1. Validate job & state
+    # --------------------------------------------------
+    if not job_dir.exists():
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    state_path = job_dir / "state.json"
+    if not state_path.exists():
+        raise HTTPException(
+            status_code=409,
+            detail="Job has not started yet"
+        )
+
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    stages = state.get("stages", {})
+
+    # --------------------------------------------------
+    # 2. Validate stage
+    # --------------------------------------------------
+    if stage not in stages:
+        raise HTTPException(status_code=404, detail="Stage not found")
+
+    stage_status = stages[stage].get("status")
+
+    if stage_status == "SKIPPED":
+        raise HTTPException(
+            status_code=404,
+            detail=f"Stage {stage} was skipped"
+        )
+
+    if stage_status in {"PENDING", "RUNNING"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Stage {stage} is not finished yet"
+        )
+
+    # --------------------------------------------------
+    # 3. Resolve log file
+    # --------------------------------------------------
+    stage_dir = job_dir / "reports" / stage.lower()
+
+    if not stage_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No reports found for stage {stage}"
+        )
+
+    expected_files = STAGE_LOG_FILES.get(stage)
+    if not expected_files:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No logs defined for stage {stage}"
+        )
+
+    for filename in expected_files:
+        file_path = stage_dir / filename
+        if file_path.exists():
+            return FileResponse(
+                file_path,
+                media_type="application/octet-stream",
+                filename=filename,
+            )
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"No log file found for stage {stage}"
+    )
+
 # Swagger UI
 # http://127.0.0.1:8000/docs
 

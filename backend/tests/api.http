@@ -74,3 +74,27 @@ Accept: application/json
 ### Download job reports (ZIP)
 GET http://127.0.0.1:8000/api/jobs/job-001/reports
 Accept: application/zip
+
+### Get SECRETS logs
+GET http://127.0.0.1:8000/api/jobs/job-001/SECRETS/logs
+
+### Get BUILD logs
+GET http://127.0.0.1:8000/api/jobs/job-001/BUILD/logs
+
+### Get TEST logs
+GET http://127.0.0.1:8000/api/jobs/job-001/TEST/logs
+
+### Get SAST logs
+GET http://127.0.0.1:8000/api/jobs/job-001/SAST/logs
+
+### Get SCA logs
+GET http://127.0.0.1:8000/api/jobs/job-001/SCA/logs
+
+### Get PACKAGE logs
+GET http://127.0.0.1:8000/api/jobs/job-001/PACKAGE/logs
+
+### Get SMOKE-TEST logs
+GET http://127.0.0.1:8000/api/jobs/job-001/SMOKE-TEST/logs
+
+### Get DAST report
+GET http://127.0.0.1:8000/api/jobs/job-001/DAST/logs
