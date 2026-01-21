@@ -53,6 +53,12 @@ RUN curl -fsSL https://repo.maven.apache.org/maven2/org/apache/maven/apache-mave
     mv /opt/apache-maven-${MAVEN_VERSION} ${MAVEN_HOME} && \
     rm /tmp/maven.zip
 
+## adding a bin to the noneroot user 
+
+RUN mkdir -p /home/runner/bin
+ENV PATH="/home/runner/bin:$PATH"
+
+
 # ---------- non-root user ----------
 RUN useradd -m -u 10001 runner
 USER runner
