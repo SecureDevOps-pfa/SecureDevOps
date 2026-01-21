@@ -137,7 +137,10 @@ def _init_state(job_dir: Path, stages: dict):
         "current_stage": None,
         "updated_at": _now(),
         "stages": {
-            stage: {"status": status}
+            stage: {
+                "status": status,
+                "message": None
+            }
             for stage, status in stages.items()
         },
     }
@@ -225,6 +228,7 @@ def _run_stage(
     # Update state → RUNNING
     state["current_stage"] = stage
     state["stages"][stage]["status"] = "RUNNING"
+    state["stages"][stage]["message"] = None
     state["updated_at"] = _now()
     _write_state(job_dir, state)
 
@@ -306,28 +310,20 @@ def _run_stage(
 
         result = json.loads(raw)
 
-    # Handle stage success
-    if result["status"] == "SUCCESS":
-        state["stages"][stage]["status"] = "SUCCESS"
-        state["updated_at"] = _now()
-        _write_state(job_dir, state)
-        return
+    stage_status = result.get("status", "FAILURE")
+    stage_message = result.get("message")
 
-    # Handle stage failure
-    state["stages"][stage]["status"] = "FAILED"
+    state["stages"][stage]["status"] = stage_status
+    state["stages"][stage]["message"] = stage_message
     state["updated_at"] = _now()
+    _write_state(job_dir, state)
 
-    # Check if this is a blocking stage
-    if stage in BLOCKING_STAGES:
+    # Stop pipeline  on blocking stage
+    if stage_status == "FAILURE" and stage in BLOCKING_STAGES:
         state["state"] = "FAILED"
-        state["error"] = result.get("message", "blocking stage failed")
+        state["error"] = stage_message or f"{stage} failed"
         _write_state(job_dir, state)
         raise RuntimeError(f"Blocking stage {stage} failed")
-
-    # Non-blocking failure → log warning and continue pipeline
-    state.setdefault("warnings", {})
-    state["warnings"][stage] = result.get("message", "stage failed")
-    _write_state(job_dir, state)
 
 
 def _read_state(job_dir: Path) -> dict:
