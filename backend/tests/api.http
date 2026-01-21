@@ -65,6 +65,40 @@ Content-Type: application/json
   }
 }
 
+### Create job from GitHub repository with custom SAST configuration
+POST http://127.0.0.1:8000/api/jobs/github
+Content-Type: application/json
+
+{
+  "github_url": "https://github.com/ABDERRAHMANE2303/math-lab.git",
+  "stack": {
+    "language": "java",
+    "framework": "spring-boot",
+    "build_tool": "maven",
+    "requires_db": false
+  },
+  "versions": {
+    "java": "17",
+    "build_tool": "3.9"
+  },
+  "pipeline": {
+    "run_secret_scan": true,
+    "secret_scan_mode": "custom",
+    "secret_custom": {
+      "install_cmd": "curl -sSL https://github.com/zricethezav/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz -o /tmp/gitleaks.tar.gz && tar -xzvf /tmp/gitleaks.tar.gz -C /home/runner/bin && chmod +x /home/runner/bin/gitleaks",
+      "tool_cmd": "gitleaks git \"$APP_DIR\" --report-format json --report-path \"$LOG_FILE\"",
+      "log_ext": "json"
+    },
+
+    "run_sast": true,
+    "sast_mode": "custom",
+    "sast_custom": {
+      "install_cmd": "curl -sSL https://github.com/semgrep/semgrep/releases/latest/download/semgrep_linux_amd64 -o /home/runner/bin/semgrep && chmod +x /home/runner/bin/semgrep",
+      "tool_cmd": "SEMGREP_CACHE_DIR=/tmp/semgrep-cache semgrep --config=p/java --disable-version-check --metrics=off --json --output \"$LOG_FILE\" \"$APP_DIR\"",
+      "log_ext": "json"
+    }
+  }
+}
 
 ### Get job status
 GET http://127.0.0.1:8000/api/jobs/job-001/status
