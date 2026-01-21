@@ -79,10 +79,10 @@ elif [ $EXIT_CODE -eq 1 ]; then
     STATUS="SUCCESS"
     MESSAGE="Security findings detected"
 elif [ $EXIT_CODE -eq 2 ]; then
-    STATUS="FAILURE"
+    STATUS="FAILED"
     MESSAGE="Security findings detected"
 else
-    STATUS="FAILURE"
+    STATUS="FAILED"
     MESSAGE="Unknown exit code $EXIT_CODE"
 fi
 

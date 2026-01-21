@@ -24,10 +24,10 @@ elif [ $EXIT_CODE -eq 1 ]; then
     STATUS="SUCCESS"
     MESSAGE="Issues found in ${APP_DIR}, see ${LOG_FILE} for details"
 elif [ $EXIT_CODE -eq 2 ]; then
-    STATUS="FAILURE"
+    STATUS="FAILED"
     MESSAGE="Semgrep execution error"
 else
-    STATUS="FAILURE"
+    STATUS="FAILED"
     MESSAGE="Unknown exit code $EXIT_CODE "
 fi
 
