@@ -6,18 +6,20 @@ import { PipelineService } from '../../services/pipeline.service';
 import { JobStatus, StageStatus } from '../../models/job-status.model';
 import { interval, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
+import { RouterModule } from '@angular/router';
+import { ChangeDetectorRef } from '@angular/core';
 
 interface StageInfo {
   name: string;
   displayName: string;
   icon: string;
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILURE' | 'SKIPPED';
 }
 
 @Component({
   selector: 'app-pipeline-monitor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './pipeline-monitor.component.html',
   styleUrls: ['./pipeline-monitor.component.scss']
 })
@@ -43,7 +45,8 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
 
   constructor(
     private route: ActivatedRoute,
-    private pipelineService: PipelineService
+    private pipelineService: PipelineService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -66,10 +69,17 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
 
     // Poll every 2 seconds
     this.pollingSubscription = interval(2000)
-      .pipe(switchMap(() => this.pipelineService.getJobStatus(this.jobId)))
+      .pipe(
+        switchMap(() => {
+          console.log('[MONITOR] polling tick');
+          return this.pipelineService.getJobStatus(this.jobId);
+        })
+      )
       .subscribe({
         next: (status) => {
           this.updateJobStatus(status);
+          this.isLoading = false;
+          this.cdr.detectChanges();
           
           // Stop polling if job is finished
           if (status.execution.state === 'SUCCEEDED' || status.execution.state === 'FAILED') {
@@ -94,6 +104,7 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
       next: (status) => {
         this.updateJobStatus(status);
         this.isLoading = false;
+        this.cdr.detectChanges();
       },
       error: (error) => {
         this.errorMessage = error.error?.detail || 'Failed to load job status';
@@ -126,7 +137,7 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
       case 'PENDING': return `${baseClass} pending`;
       case 'RUNNING': return `${baseClass} running`;
       case 'SUCCESS': return `${baseClass} success`;
-      case 'FAILED': return `${baseClass} failed`;
+      case 'FAILURE': return `${baseClass} failed`;
       case 'SKIPPED': return `${baseClass} skipped`;
       default: return baseClass;
     }

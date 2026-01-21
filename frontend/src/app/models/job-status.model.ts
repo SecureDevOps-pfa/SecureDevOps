@@ -1,5 +1,5 @@
 export interface StageStatus {
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILURE' | 'SKIPPED';
 }
 
 export interface ExecutionStatus {

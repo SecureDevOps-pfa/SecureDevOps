@@ -73,7 +73,7 @@
         <div class="stage-connector" *ngIf="i < stages.length - 1">
           <div class="connector-line" 
                [class.completed]="stage.status === 'SUCCESS'"
-               [class.failed]="stage.status === 'FAILED'">
+               [class.failed]="stage.status === 'FAILURE'">
           </div>
         </div>
       </div>
