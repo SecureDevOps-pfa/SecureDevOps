@@ -10,3 +10,14 @@ This mode enforces fail-fast behavior and prevents silent or partially successfu
 
 - for custum scripts mention to user that the runner env is x86_64 Linux (when they wanty to install )
 - the user command should expect to write to one output named `"${LOG_FILE}"` and the directory of the project to be `"$APP_DIR"`
+
+
+
+update docker way to use always pull like in here : 
+docker run --pull=always --rm -it \
+  -u 10001:10001 \
+  -v /home/abderrahmane/Desktop/SecureDevOps/test/source:/home/runner/source:rw \
+  -v /home/abderrahmane/Desktop/SecureDevOps/test/pipelines:/home/runner/pipelines:ro \
+  -v /home/abderrahmane/Desktop/SecureDevOps/test/reports:/home/runner/reports:rw \
+  -w /home/runner \
+  abderrahmane03/pipelinex:java17-mvn3.9.12-latest

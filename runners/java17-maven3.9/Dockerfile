@@ -55,7 +55,8 @@ RUN curl -fsSL https://repo.maven.apache.org/maven2/org/apache/maven/apache-mave
 
 ## adding a bin to the noneroot user 
 
-RUN mkdir -p /home/runner/bin
+RUN mkdir -p /home/runner/bin \
+    && chown -R 10001:10001 /home/runner/bin
 ENV PATH="/home/runner/bin:$PATH"
 
 
