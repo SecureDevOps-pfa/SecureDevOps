@@ -7,11 +7,21 @@ from services.job_orchestrator import JobOrchestrator
 from fastapi.responses import FileResponse
 import zipfile
 import tempfile
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Secure DevSecOps Pipeline",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:4200",  # Angular dev server
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 orchestrator = JobOrchestrator()
