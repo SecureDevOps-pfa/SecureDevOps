@@ -130,7 +130,8 @@ def get_job_status(job_id: str):
 
         for flag, stage in stage_map:
             stages[stage] = {
-                "status": "PENDING" if pipeline.get(flag, False) else "SKIPPED"
+                "status": "PENDING" if pipeline.get(flag, False) else "SKIPPED",
+                "message": None
             }
 
         return {
@@ -140,7 +141,6 @@ def get_job_status(job_id: str):
                 "current_stage": None,
                 "updated_at": metadata.get("created_at"),
                 "stages": stages,
-                "warnings": {},
             },
         }
 
@@ -154,7 +154,6 @@ def get_job_status(job_id: str):
         "current_stage": state.get("current_stage"),
         "updated_at": state.get("updated_at"),
         "stages": state.get("stages", {}),
-        "warnings": state.get("warnings", {}),
     }
 
     return {
