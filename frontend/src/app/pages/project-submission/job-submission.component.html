@@ -1,0 +1,151 @@
+<div class="job-submission-container">
+  <div class="card">
+    <h1>Submit DevSecOps Pipeline Job</h1>
+
+    <!-- Input Type Selection -->
+    <div class="form-group">
+      <label class="section-label">Input Type</label>
+      <div class="input-type-selector">
+        <button 
+          [class.active]="inputType === 'zip'"
+          (click)="inputType = 'zip'">
+          <span class="icon">📦</span>
+          ZIP Upload
+        </button>
+        <button 
+          [class.active]="inputType === 'github'"
+          (click)="inputType = 'github'">
+          <span class="icon">🔗</span>
+          GitHub Repository
+        </button>
+      </div>
+    </div>
+
+    <!-- ZIP Upload -->
+    <div class="form-group" *ngIf="inputType === 'zip'">
+      <label>Project Archive</label>
+      <div class="file-input-wrapper">
+        <input 
+          type="file" 
+          accept=".zip"
+          (change)="onFileSelected($event)"
+          id="file-input">
+        <label for="file-input" class="file-input-label">
+          <span class="icon">📁</span>
+          {{ selectedFile ? selectedFile.name : 'Choose ZIP file' }}
+        </label>
+      </div>
+    </div>
+
+    <!-- GitHub URL -->
+    <div class="form-group" *ngIf="inputType === 'github'">
+      <label>GitHub Repository URL</label>
+      <input 
+        type="text" 
+        [(ngModel)]="githubUrl"
+        placeholder="https://github.com/username/repository"
+        class="text-input">
+    </div>
+
+    <!-- Framework Selection -->
+    <div class="form-group">
+      <label class="section-label">Project Stack</label>
+      <select [(ngModel)]="selectedFramework" (change)="onFrameworkChange()" class="select-input">
+        <option *ngFor="let fw of frameworks" [ngValue]="fw">
+          {{ fw.label }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Versions -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>Java Version</label>
+        <input type="text" [(ngModel)]="javaVersion" class="text-input">
+      </div>
+      <div class="form-group">
+        <label>Maven Version</label>
+        <input type="text" [(ngModel)]="mavenVersion" class="text-input">
+      </div>
+    </div>
+
+    <!-- Database Requirement -->
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="requiresDatabase">
+        <span>Project Requires Database</span>
+      </label>
+    </div>
+
+    <!-- Pipeline Configuration -->
+    <div class="pipeline-config">
+      <label class="section-label">Pipeline Stages</label>
+      
+      <div class="pipeline-options">
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_secret_scan">
+          <span>🔐 Secret Scan</span>
+        </label>
+
+        <div class="indent" *ngIf="pipelineOptions.run_secret_scan">
+          <label class="radio-label">
+            <input type="radio" [(ngModel)]="pipelineOptions.secret_scan_mode" value="dir">
+            <span>Directory Scan</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" [(ngModel)]="pipelineOptions.secret_scan_mode" value="git" [disabled]="inputType === 'zip'">
+            <span>Git History Scan {{ inputType === 'zip' ? '(ZIP not supported)' : '' }}</span>
+          </label>
+        </div>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_build">
+          <span>🔨 Build</span>
+        </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_unit_tests">
+          <span>🧪 Unit Tests</span>
+        </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_sast">
+          <span>🔍 SAST (Static Analysis)</span>
+        </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_sca">
+          <span>📦 SCA (Dependency Scan)</span>
+        </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_package">
+          <span>📦 Package</span>
+        </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_smoke">
+          <span>💨 Smoke Tests</span>
+        </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="pipelineOptions.run_dast">
+          <span>🛡️ DAST (Dynamic Analysis)</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div class="error-message" *ngIf="errorMessage">
+      ⚠️ {{ errorMessage }}
+    </div>
+
+    <!-- Submit Button -->
+    <button 
+      class="submit-button"
+      [disabled]="isSubmitting"
+      (click)="submitJob()">
+      {{ isSubmitting ? 'Submitting...' : 'Submit Pipeline Job' }}
+    </button>
+  </div>
+</div>
