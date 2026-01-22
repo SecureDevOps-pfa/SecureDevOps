@@ -147,6 +147,69 @@
       </div>
     </div>
 
+    <!-- Terminal Logs Section -->
+    <div class="logs-section">
+      <div class="logs-header">
+        <div class="logs-title">
+          <lucide-icon [img]="icons['Terminal']" [size]="18"></lucide-icon>
+          <h3>Stage Logs</h3>
+          <span class="selected-stage-badge" *ngIf="selectedStage && stageMapping[selectedStage]">
+            <lucide-icon [img]="getStageIcon(stageMapping[selectedStage].icon)" [size]="14"></lucide-icon>
+            {{ stageMapping[selectedStage].displayName }}
+          </span>
+          <span class="auto-refresh-badge" *ngIf="autoRefreshLogs">
+            <lucide-icon [img]="icons['Loader']" [size]="12" class="spinning"></lucide-icon>
+            Live
+          </span>
+        </div>
+        <button 
+          *ngIf="selectedStage" 
+          (click)="clearLogs()" 
+          class="btn-clear">
+          <lucide-icon [img]="icons['X']" [size]="14"></lucide-icon>
+          Clear
+        </button>
+      </div>
+
+      <!-- Stage Selector -->
+      <div class="stage-selector">
+        <button 
+          *ngFor="let stage of stages"
+          [disabled]="stage.status === 'PENDING' || stage.status === 'SKIPPED'"
+          [class.active]="selectedStage === stage.name"
+          [class.running]="stage.status === 'RUNNING'"
+          [attr.title]="stage.displayName + ' (' + stage.status + ')'"
+          (click)="loadStageLogs(stage.name)"
+          class="stage-btn stage-btn-icon">
+          <lucide-icon [img]="getStageIcon(stage.icon)" [size]="18"></lucide-icon>
+        </button>
+      </div>
+
+      <!-- Logs Display -->
+      <div class="logs-display">
+        <!-- Loading State -->
+        <div class="logs-loading" *ngIf="logsLoading">
+          <lucide-icon [img]="icons['Loader']" class="spinner-icon"></lucide-icon>
+          <span>Loading logs...</span>
+        </div>
+
+        <!-- Error State -->
+        <div class="logs-error" *ngIf="logsError && !logsLoading">
+          <lucide-icon [img]="icons['TriangleAlert']" [size]="16"></lucide-icon>
+          <span>{{ logsError }}</span>
+        </div>
+
+        <!-- Empty State -->
+        <div class="logs-empty" *ngIf="!selectedStage && !logsLoading && !logsError">
+          <lucide-icon [img]="icons['Terminal']" [size]="32" [strokeWidth]="1"></lucide-icon>
+          <span>Select a completed stage to view logs</span>
+        </div>
+
+        <!-- Logs Content -->
+        <pre class="logs-content" *ngIf="stageLogs && !logsLoading">{{ stageLogs }}</pre>
+      </div>
+    </div>
+
     <!-- Actions -->
     <div class="actions-bar">
       <button 

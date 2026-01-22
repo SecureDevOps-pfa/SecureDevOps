@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+﻿import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -31,7 +31,15 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
   isLoading: boolean = true;
   errorMessage: string = '';
   
+  // Logs
+  selectedStage: string = '';
+  stageLogs: string = '';
+  logsLoading: boolean = false;
+  logsError: string = '';
+  autoRefreshLogs: boolean = false;
+  
   private pollingSubscription?: Subscription;
+  private logsPollingSubscription?: Subscription;
 
   // Lucide icons
   readonly icons: { [key: string]: any } = {
@@ -53,7 +61,8 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
     Code: icons.Code,
     Wrench: icons.Wrench,
     Info: icons.Info,
-    ChevronRight: icons.ChevronRight
+    ChevronRight: icons.ChevronRight,
+    Terminal: icons.Terminal
   };
 
   stageMapping: { [key: string]: { displayName: string; icon: string } } = {
@@ -89,6 +98,7 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPolling();
+    this.stopLogsPolling();
   }
 
   startPolling(): void {
@@ -142,8 +152,24 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
   }
 
   updateJobStatus(status: JobStatus): void {
+    const previousCurrentStage = this.jobStatus?.execution.current_stage;
+    const previousState = this.jobStatus?.execution.state;
     this.jobStatus = status;
     this.stages = this.buildStagesList(status);
+
+    // Auto-select current running stage if no stage is selected or stage changed
+    const currentStage = status.execution.current_stage;
+    if (currentStage) {
+      if (!this.selectedStage || currentStage !== previousCurrentStage) {
+        this.loadStageLogs(currentStage);
+      }
+    } else if (!this.selectedStage && (status.execution.state === 'SUCCEEDED' || status.execution.state === 'FAILED')) {
+      // Pipeline finished but no stage selected - select the last completed stage
+      const lastStage = this.stages.filter(s => s.status === 'SUCCESS' || s.status === 'FAILED').pop();
+      if (lastStage) {
+        this.loadStageLogs(lastStage.name);
+      }
+    }
   }
 
   buildStagesList(status: JobStatus): StageInfo[] {
@@ -217,5 +243,101 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
 
   getWarnings(): [string, any][] {
     return this.jobStatus?.execution?.warnings ? Object.entries(this.jobStatus.execution.warnings) : [];
+  }
+
+  loadStageLogs(stageName: string): void {
+    const stage = this.jobStatus?.execution.stages[stageName];
+    if (!stage || stage.status === 'SKIPPED' || stage.status === 'PENDING') {
+      this.logsError = `Stage ${stageName} has not started yet or was skipped`;
+      this.stageLogs = '';
+      this.selectedStage = '';
+      return;
+    }
+
+    this.selectedStage = stageName;
+    this.logsError = '';
+    this.stageLogs = '';
+
+    // Stop any existing logs polling
+    this.stopLogsPolling();
+
+    // If stage is RUNNING, show waiting message and start polling
+    if (stage.status === 'RUNNING') {
+      this.logsLoading = false;
+      this.stageLogs = `# Stage ${stageName} is currently running...\n# Logs will appear when the stage completes\n# Waiting for stage to finish...`;
+      this.autoRefreshLogs = true;
+      // Poll every 2 seconds to check if stage completed
+      this.startLogsPolling(stageName);
+    } else {
+      // Stage is completed (SUCCESS or FAILED) - fetch logs immediately
+      this.logsLoading = true;
+      this.autoRefreshLogs = false;
+      this.fetchStageLogs(stageName);
+    }
+  }
+
+  fetchStageLogs(stageName: string): void {
+    this.pipelineService.getJobLogs(this.jobId, stageName).subscribe({
+      next: (logs) => {
+        this.stageLogs = logs;
+        this.logsLoading = false;
+        this.logsError = '';
+      },
+      error: (error) => {
+        const errorDetail = error.error?.detail || error.message || 'Failed to load logs';
+        const status = error.status;
+        
+        // Stage is completed but logs not available
+        if (status === 404) {
+          console.log(`[Logs] No logs available for ${stageName}: ${errorDetail}`);
+          this.logsError = '';
+          this.stageLogs = `# No logs available for ${stageName}\n# The stage completed but did not generate any log output`;
+        } else {
+          console.error(`[Logs] Error loading logs for ${stageName}:`, error);
+          this.logsError = errorDetail;
+          this.stageLogs = '';
+        }
+        this.logsLoading = false;
+      }
+    });
+  }
+
+  startLogsPolling(stageName: string): void {
+    // Poll every 2 seconds to check if stage is completed
+    this.logsPollingSubscription = interval(2000)
+      .subscribe(() => {
+        const stage = this.jobStatus?.execution.stages[stageName];
+        
+        // Check if stage has completed
+        if (stage && (stage.status === 'SUCCESS' || stage.status === 'FAILED')) {
+          // Stage completed - fetch logs and stop polling
+          this.stopLogsPolling();
+          this.autoRefreshLogs = false;
+          this.logsLoading = true;
+          this.fetchStageLogs(stageName);
+        } else if (stage?.status === 'RUNNING') {
+          // Still running - update waiting message
+          this.stageLogs = `# Stage ${stageName} is currently running...\n# Logs will appear when the stage completes\n# Waiting for stage to finish...`;
+        } else {
+          // Stage status changed unexpectedly - stop polling
+          this.stopLogsPolling();
+          this.autoRefreshLogs = false;
+        }
+      });
+  }
+
+  stopLogsPolling(): void {
+    if (this.logsPollingSubscription) {
+      this.logsPollingSubscription.unsubscribe();
+      this.logsPollingSubscription = undefined;
+    }
+  }
+
+  clearLogs(): void {
+    this.selectedStage = '';
+    this.stageLogs = '';
+    this.logsError = '';
+    this.autoRefreshLogs = false;
+    this.stopLogsPolling();
   }
 }

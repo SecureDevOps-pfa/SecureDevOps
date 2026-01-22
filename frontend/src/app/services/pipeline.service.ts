@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { JobCreationResponse, ProjectMetadata } from '../models/project-metadata.model';
 import { JobStatus } from '../models/job-status.model';
@@ -42,5 +43,19 @@ export class PipelineService {
     return this.http.get(`${this.apiUrl}/jobs/${jobId}/reports`, {
       responseType: 'blob'
     });
+  }
+
+  getJobLogs(jobId: string, stage: string): Observable<string> {
+    // Backend returns FileResponse with application/octet-stream
+    // We need to get it as arraybuffer and decode it manually
+    return this.http.get(`${this.apiUrl}/jobs/${jobId}/${stage}/logs`, {
+      responseType: 'arraybuffer'
+    }).pipe(
+      map(buffer => {
+        // Decode the arraybuffer to text
+        const decoder = new TextDecoder('utf-8');
+        return decoder.decode(buffer);
+      })
+    );
   }
 }
