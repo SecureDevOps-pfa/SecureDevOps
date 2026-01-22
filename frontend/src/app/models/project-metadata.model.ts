@@ -10,12 +10,21 @@ export interface Versions {
   build_tool?: string;
 }
 
+export interface CustomToolConfig {
+  install_cmd: string;
+  tool_cmd: string;
+  log_ext: string;
+}
+
 export interface Pipeline {
   run_secret_scan: boolean;
-  secret_scan_mode: 'dir' | 'git';
+  secret_scan_mode: 'dir' | 'git' | 'custom';
+  secret_custom?: CustomToolConfig;
   run_build: boolean;
   run_unit_tests: boolean;
   run_sast: boolean;
+  sast_mode: 'default' | 'custom';
+  sast_custom?: CustomToolConfig;
   run_sca: boolean;
   run_package: boolean;
   run_smoke: boolean;

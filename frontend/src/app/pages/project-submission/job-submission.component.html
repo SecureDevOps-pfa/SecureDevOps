@@ -1,55 +1,96 @@
 <div class="job-submission-container">
+  <!-- Logo -->
+  <div class="logo-container">
+    <img src="/logo.png" alt="Logo" class="logo">
+  </div>
+
   <div class="card">
-    <h1>Submit DevSecOps Pipeline Job</h1>
+    <div class="card-header">
+      <h1>Submit DevSecOps Pipeline</h1>
+      <p class="subtitle">Configure and submit your project for security analysis</p>
+    </div>
 
     <!-- Input Type Selection -->
-    <div class="form-group">
-      <label class="section-label">Input Type</label>
+    <div class="form-section">
+      <label class="section-label">
+        <lucide-icon [img]="icons['Upload']" [size]="18"></lucide-icon>
+        Input Source
+      </label>
       <div class="input-type-selector">
         <button 
+          type="button"
           [class.active]="inputType === 'zip'"
           (click)="inputType = 'zip'">
-          <span class="icon">📦</span>
+          <lucide-icon [img]="icons['FileArchive']" [size]="20"></lucide-icon>
           ZIP Upload
         </button>
         <button 
+          type="button"
           [class.active]="inputType === 'github'"
           (click)="inputType = 'github'">
-          <span class="icon">🔗</span>
+          <lucide-icon [img]="icons['Github']" [size]="20"></lucide-icon>
           GitHub Repository
         </button>
       </div>
     </div>
 
-    <!-- ZIP Upload -->
-    <div class="form-group" *ngIf="inputType === 'zip'">
-      <label>Project Archive</label>
-      <div class="file-input-wrapper">
+    <!-- ZIP Upload with Drag & Drop -->
+    <div class="form-section" *ngIf="inputType === 'zip'">
+      <label class="section-label">
+        <lucide-icon [img]="icons['Package']" [size]="18"></lucide-icon>
+        Project Archive
+      </label>
+      <div 
+        class="dropzone" 
+        [class.dragging]="isDragging"
+        [class.has-file]="selectedFile"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        (click)="fileInput.click()">
         <input 
+          #fileInput
           type="file" 
           accept=".zip"
           (change)="onFileSelected($event)"
-          id="file-input">
-        <label for="file-input" class="file-input-label">
-          <span class="icon">📁</span>
-          {{ selectedFile ? selectedFile.name : 'Choose ZIP file' }}
-        </label>
+          style="display: none;">
+        
+        <div class="dropzone-content" *ngIf="!selectedFile">
+          <lucide-icon [img]="icons['Upload']" [size]="48" [strokeWidth]="1.5"></lucide-icon>
+          <p class="dropzone-text">Drag and drop your ZIP file here</p>
+          <p class="dropzone-subtext">or click to browse</p>
+        </div>
+
+        <div class="dropzone-content selected" *ngIf="selectedFile">
+          <lucide-icon [img]="icons['FileArchive']" [size]="48" [strokeWidth]="1.5"></lucide-icon>
+          <p class="dropzone-text">{{ selectedFile.name }}</p>
+          <p class="dropzone-subtext">{{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
+        </div>
       </div>
     </div>
 
     <!-- GitHub URL -->
-    <div class="form-group" *ngIf="inputType === 'github'">
-      <label>GitHub Repository URL</label>
-      <input 
-        type="text" 
-        [(ngModel)]="githubUrl"
-        placeholder="https://github.com/username/repository"
-        class="text-input">
+    <div class="form-section" *ngIf="inputType === 'github'">
+      <label class="section-label">
+        <lucide-icon [img]="icons['GitBranch']" [size]="18"></lucide-icon>
+        Repository URL
+      </label>
+      <div class="input-wrapper">
+        <lucide-icon [img]="icons['Github']" [size]="18" class="input-icon"></lucide-icon>
+        <input 
+          type="text" 
+          [(ngModel)]="githubUrl"
+          placeholder="https://github.com/username/repository"
+          class="text-input">
+      </div>
     </div>
 
     <!-- Framework Selection -->
-    <div class="form-group">
-      <label class="section-label">Project Stack</label>
+    <div class="form-section">
+      <label class="section-label">
+        <lucide-icon [img]="icons['Code']" [size]="18"></lucide-icon>
+        Project Stack
+      </label>
       <select [(ngModel)]="selectedFramework" (change)="onFrameworkChange()" class="select-input">
         <option *ngFor="let fw of frameworks" [ngValue]="fw">
           {{ fw.label }}
@@ -59,85 +100,213 @@
 
     <!-- Versions -->
     <div class="form-row">
-      <div class="form-group">
-        <label>Java Version</label>
-        <input type="text" [(ngModel)]="javaVersion" class="text-input">
+      <div class="form-section">
+        <label class="section-label">Java Version</label>
+        <input type="text" [(ngModel)]="javaVersion" class="text-input" placeholder="17">
       </div>
-      <div class="form-group">
-        <label>Maven Version</label>
-        <input type="text" [(ngModel)]="mavenVersion" class="text-input">
+      <div class="form-section">
+        <label class="section-label">Maven Version</label>
+        <input type="text" [(ngModel)]="mavenVersion" class="text-input" placeholder="3.9">
       </div>
     </div>
 
     <!-- Database Requirement -->
-    <div class="form-group">
+    <div class="form-section">
       <label class="checkbox-label">
         <input type="checkbox" [(ngModel)]="requiresDatabase">
-        <span>Project Requires Database</span>
+        <span class="checkbox-custom"></span>
+        <lucide-icon [img]="icons['Database']" [size]="18"></lucide-icon>
+        <span class="checkbox-text">Project Requires Database</span>
       </label>
     </div>
 
     <!-- Pipeline Configuration -->
     <div class="pipeline-config">
-      <label class="section-label">Pipeline Stages</label>
+      <label class="section-label">
+        <lucide-icon [img]="icons['Settings']" [size]="18"></lucide-icon>
+        Pipeline Stages
+      </label>
       
       <div class="pipeline-options">
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_secret_scan">
-          <span>🔐 Secret Scan</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['Shield']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">Secret Scan</span>
         </label>
 
         <div class="indent" *ngIf="pipelineOptions.run_secret_scan">
           <label class="radio-label">
-            <input type="radio" [(ngModel)]="pipelineOptions.secret_scan_mode" value="dir">
-            <span>Directory Scan</span>
+            <input type="radio" name="secretScanMode" [(ngModel)]="pipelineOptions.secret_scan_mode" value="dir">
+            <span class="radio-custom"></span>
+            <span class="radio-text">Directory Scan (Default)</span>
           </label>
           <label class="radio-label">
-            <input type="radio" [(ngModel)]="pipelineOptions.secret_scan_mode" value="git" [disabled]="inputType === 'zip'">
-            <span>Git History Scan {{ inputType === 'zip' ? '(ZIP not supported)' : '' }}</span>
+            <input type="radio" name="secretScanMode" [(ngModel)]="pipelineOptions.secret_scan_mode" value="git" [disabled]="inputType === 'zip'">
+            <span class="radio-custom"></span>
+            <span class="radio-text">Git History Scan {{ inputType === 'zip' ? '(ZIP not supported)' : '' }}</span>
           </label>
+          <label class="radio-label">
+            <input type="radio" name="secretScanMode" [(ngModel)]="pipelineOptions.secret_scan_mode" value="custom">
+            <span class="radio-custom"></span>
+            <span class="radio-text">Custom Tool</span>
+          </label>
+
+          <!-- Custom Secret Scan Configuration -->
+          <div class="custom-tool-config" *ngIf="pipelineOptions.secret_scan_mode === 'custom'">
+            <div class="info-banner">
+              <lucide-icon [img]="icons['Info']" [size]="16"></lucide-icon>
+              <div class="info-content">
+                <p><strong>Custom Tool Requirements:</strong></p>
+                <ul>
+                  <li>Use variables: <code>$LOG_FILE</code> and <code>$APP_DIR</code> in your commands</li>
+                  <li>Install command must NOT include <code>sudo</code></li>
+                  <li>Do NOT use package managers (apt, yum) as they require sudo</li>
+                  <li>Executables should be placed in <code>/home/runner/bin/</code></li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <label class="section-label">Install Command</label>
+              <input 
+                type="text" 
+                [(ngModel)]="pipelineOptions.secret_custom.install_cmd"
+                placeholder="e.g., wget -O /home/runner/bin/tool https://example.com/tool && chmod +x /home/runner/bin/tool"
+                class="text-input">
+            </div>
+
+            <div class="form-section">
+              <label class="section-label">Tool Command</label>
+              <input 
+                type="text" 
+                [(ngModel)]="pipelineOptions.secret_custom.tool_cmd"
+                placeholder="e.g., tool scan &quot;$APP_DIR&quot; --output &quot;$LOG_FILE&quot;"
+                class="text-input">
+            </div>
+
+            <div class="form-section">
+              <label class="section-label">Output File Extension</label>
+              <input 
+                type="text" 
+                [(ngModel)]="pipelineOptions.secret_custom.log_ext"
+                placeholder="json"
+                class="text-input">
+            </div>
+          </div>
         </div>
 
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_build">
-          <span>🔨 Build</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['Hammer']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">Build</span>
         </label>
 
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_unit_tests">
-          <span>🧪 Unit Tests</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['TestTube']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">Unit Tests</span>
         </label>
 
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_sast">
-          <span>🔍 SAST (Static Analysis)</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['Search']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">SAST (Static Analysis)</span>
         </label>
+
+        <div class="indent" *ngIf="pipelineOptions.run_sast">
+          <label class="radio-label">
+            <input type="radio" name="sastMode" [(ngModel)]="pipelineOptions.sast_mode" value="default">
+            <span class="radio-custom"></span>
+            <span class="radio-text">Default (Semgrep)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="sastMode" [(ngModel)]="pipelineOptions.sast_mode" value="custom">
+            <span class="radio-custom"></span>
+            <span class="radio-text">Custom Tool</span>
+          </label>
+
+          <!-- Custom SAST Configuration -->
+          <div class="custom-tool-config" *ngIf="pipelineOptions.sast_mode === 'custom'">
+            <div class="info-banner">
+              <lucide-icon [img]="icons['Info']" [size]="16"></lucide-icon>
+              <div class="info-content">
+                <p><strong>Custom Tool Requirements:</strong></p>
+                <ul>
+                  <li>Use variables: <code>$LOG_FILE</code> and <code>$APP_DIR</code> in your commands</li>
+                  <li>Install command must NOT include <code>sudo</code></li>
+                  <li>Do NOT use package managers (apt, yum) as they require sudo</li>
+                  <li>Executables should be placed in <code>/home/runner/bin/</code></li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <label class="section-label">Install Command</label>
+              <input 
+                type="text" 
+                [(ngModel)]="pipelineOptions.sast_custom.install_cmd"
+                placeholder="e.g., pip install --user bandit"
+                class="text-input">
+            </div>
+
+            <div class="form-section">
+              <label class="section-label">Tool Command</label>
+              <input 
+                type="text" 
+                [(ngModel)]="pipelineOptions.sast_custom.tool_cmd"
+                placeholder="e.g., bandit -r &quot;$APP_DIR&quot; -f json -o &quot;$LOG_FILE&quot;"
+                class="text-input">
+            </div>
+
+            <div class="form-section">
+              <label class="section-label">Output File Extension</label>
+              <input 
+                type="text" 
+                [(ngModel)]="pipelineOptions.sast_custom.log_ext"
+                placeholder="json"
+                class="text-input">
+            </div>
+          </div>
+        </div>
 
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_sca">
-          <span>📦 SCA (Dependency Scan)</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['Layers']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">SCA (Dependency Scan)</span>
         </label>
 
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_package">
-          <span>📦 Package</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['Box']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">Package</span>
         </label>
 
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_smoke">
-          <span>💨 Smoke Tests</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['Flame']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">Smoke Tests</span>
         </label>
 
         <label class="checkbox-label">
           <input type="checkbox" [(ngModel)]="pipelineOptions.run_dast">
-          <span>🛡️ DAST (Dynamic Analysis)</span>
+          <span class="checkbox-custom"></span>
+          <lucide-icon [img]="icons['ShieldCheck']" [size]="18"></lucide-icon>
+          <span class="checkbox-text">DAST (Dynamic Analysis)</span>
         </label>
       </div>
     </div>
 
     <!-- Error Message -->
     <div class="error-message" *ngIf="errorMessage">
-      ⚠️ {{ errorMessage }}
+      <lucide-icon [img]="icons['TriangleAlert']" [size]="18"></lucide-icon>
+      {{ errorMessage }}
     </div>
 
     <!-- Submit Button -->
@@ -145,6 +314,7 @@
       class="submit-button"
       [disabled]="isSubmitting"
       (click)="submitJob()">
+      <lucide-icon [img]="icons['Play']" [size]="20"></lucide-icon>
       {{ isSubmitting ? 'Submitting...' : 'Submit Pipeline Job' }}
     </button>
   </div>
