@@ -1,0 +1,233 @@
+<div class="pipeline-monitor-container">
+  <!-- Logo -->
+  <div class="logo-container">
+    <img src="/logo.png" alt="Logo" class="logo">
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-card" *ngIf="isLoading">
+    <lucide-icon [img]="icons['Loader']" class="spinner-icon"></lucide-icon>
+    <p>Loading pipeline status...</p>
+  </div>
+
+  <!-- Error State -->
+  <div class="error-card" *ngIf="!isLoading && errorMessage">
+    <lucide-icon [img]="icons['TriangleAlert']" class="error-icon"></lucide-icon>
+    <h2>Error</h2>
+    <p>{{ errorMessage }}</p>
+    <button routerLink="/" class="btn-secondary">
+      <lucide-icon [img]="icons['ArrowLeft']" [size]="16"></lucide-icon>
+      Back to Submission
+    </button>
+  </div>
+
+  <!-- Pipeline View -->
+  <div class="pipeline-content" *ngIf="!isLoading && !errorMessage && jobStatus">
+    <!-- Header -->
+    <div class="pipeline-header">
+      <div class="header-top">
+        <h1>Pipeline Execution</h1>
+        <div class="status-badge" [ngClass]="getOverallStatusClass()">
+          <lucide-icon 
+            *ngIf="jobStatus.execution.state === 'SUCCEEDED'" 
+            [img]="icons['Check']" 
+            [size]="16">
+          </lucide-icon>
+          <lucide-icon 
+            *ngIf="jobStatus.execution.state === 'FAILED'" 
+            [img]="icons['X']" 
+            [size]="16">
+          </lucide-icon>
+          <lucide-icon 
+            *ngIf="jobStatus.execution.state === 'RUNNING'" 
+            [img]="icons['Loader']" 
+            [size]="16"
+            class="spinning">
+          </lucide-icon>
+          <lucide-icon 
+            *ngIf="jobStatus.execution.state === 'QUEUED'" 
+            [img]="icons['Clock']" 
+            [size]="16">
+          </lucide-icon>
+          {{ jobStatus.execution.state }}
+        </div>
+      </div>
+      
+      <div class="job-meta">
+        <div class="meta-item">
+          <lucide-icon [img]="icons['Code']" [size]="14"></lucide-icon>
+          <span class="meta-label">Job ID:</span>
+          <code>{{ jobStatus.job.id }}</code>
+        </div>
+        <div class="meta-item">
+          <lucide-icon [img]="icons['Info']" [size]="14"></lucide-icon>
+          <span class="meta-label">Framework:</span>
+          <span>{{ jobStatus.job.stack.framework }}</span>
+        </div>
+        <div class="meta-item">
+          <lucide-icon [img]="icons['Wrench']" [size]="14"></lucide-icon>
+          <span class="meta-label">Build Tool:</span>
+          <span>{{ jobStatus.job.stack.build_tool }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current Stage Indicator -->
+    <div class="current-stage-banner" *ngIf="jobStatus.execution.current_stage">
+      <div class="pulse-indicator"></div>
+      <span>Currently running: <strong>{{ jobStatus.execution.current_stage }}</strong></span>
+    </div>
+
+    <!-- Pipeline Stages - Horizontal Progressive Design -->
+    <div class="pipeline-stages-container">
+      <div class="stages-track">
+        <div 
+          class="stage-item" 
+          *ngFor="let stage of stages; let i = index; let isLast = last"
+          [attr.data-status]="stage.status">
+          
+          <!-- Stage Node -->
+          <div class="stage-node" [ngClass]="'status-' + stage.status.toLowerCase()">
+            <!-- Stage Icon (always visible) -->
+            <lucide-icon 
+              [img]="getStageIcon(stage.icon)" 
+              [size]="26"
+              [strokeWidth]="1.8"
+              class="stage-main-icon">
+            </lucide-icon>
+            
+            <!-- Status indicator overlay for SUCCESS -->
+            <div class="status-indicator success" *ngIf="stage.status === 'SUCCESS'">
+              <lucide-icon [img]="icons['Check']" [size]="12" [strokeWidth]="3"></lucide-icon>
+            </div>
+            
+            <!-- Status indicator overlay for FAILURE -->
+            <div class="status-indicator failure" *ngIf="stage.status === 'FAILED'">
+              <lucide-icon [img]="icons['X']" [size]="12" [strokeWidth]="3"></lucide-icon>
+            </div>
+            
+            <!-- Spinning overlay for RUNNING -->
+            <div class="running-ring" *ngIf="stage.status === 'RUNNING'"></div>
+          </div>
+
+          <!-- Stage Label -->
+          <div class="stage-label">
+            <span class="stage-name">{{ stage.displayName }}</span>
+            <span class="stage-status" [ngClass]="'status-text-' + stage.status.toLowerCase()">
+              {{ stage.status }}
+            </span>
+          </div>
+
+          <!-- Connector -->
+          <div class="stage-connector" *ngIf="!isLast">
+            <div 
+              class="connector-line" 
+              [ngClass]="{
+                'completed': stage.status === 'SUCCESS',
+                'active': stage.status === 'RUNNING',
+                'failed': stage.status === 'FAILED'
+              }">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warnings -->
+    <div class="warnings-section" *ngIf="getWarnings().length > 0">
+      <div class="warnings-header">
+        <lucide-icon [img]="icons['TriangleAlert']" [size]="18"></lucide-icon>
+        <h3>Warnings</h3>
+      </div>
+      <div class="warning-item" *ngFor="let warning of getWarnings()">
+        <lucide-icon [img]="icons['ChevronRight']" [size]="14"></lucide-icon>
+        <div>
+          <strong>{{ warning[0] }}:</strong> {{ warning[1] }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Terminal Logs Section -->
+    <div class="logs-section">
+      <div class="logs-header">
+        <div class="logs-title">
+          <lucide-icon [img]="icons['Terminal']" [size]="18"></lucide-icon>
+          <h3>Stage Logs</h3>
+          <span class="selected-stage-badge" *ngIf="selectedStage && stageMapping[selectedStage]">
+            <lucide-icon [img]="getStageIcon(stageMapping[selectedStage].icon)" [size]="14"></lucide-icon>
+            {{ stageMapping[selectedStage].displayName }}
+          </span>
+          <span class="auto-refresh-badge" *ngIf="autoRefreshLogs">
+            <lucide-icon [img]="icons['Loader']" [size]="12" class="spinning"></lucide-icon>
+            Live
+          </span>
+        </div>
+        <button 
+          *ngIf="selectedStage" 
+          (click)="clearLogs()" 
+          class="btn-clear">
+          <lucide-icon [img]="icons['X']" [size]="14"></lucide-icon>
+          Clear
+        </button>
+      </div>
+
+      <!-- Stage Selector -->
+      <div class="stage-selector">
+        <button 
+          *ngFor="let stage of stages"
+          [disabled]="stage.status === 'PENDING' || stage.status === 'SKIPPED'"
+          [class.active]="selectedStage === stage.name"
+          [class.running]="stage.status === 'RUNNING'"
+          [attr.title]="stage.displayName + ' (' + stage.status + ')'"
+          (click)="loadStageLogs(stage.name)"
+          class="stage-btn stage-btn-icon">
+          <lucide-icon [img]="getStageIcon(stage.icon)" [size]="18"></lucide-icon>
+        </button>
+      </div>
+
+      <!-- Logs Display -->
+      <div class="logs-display">
+        <!-- Loading State -->
+        <div class="logs-loading" *ngIf="logsLoading">
+          <lucide-icon [img]="icons['Loader']" class="spinner-icon"></lucide-icon>
+          <span>Loading logs...</span>
+        </div>
+
+        <!-- Error State -->
+        <div class="logs-error" *ngIf="logsError && !logsLoading">
+          <lucide-icon [img]="icons['TriangleAlert']" [size]="16"></lucide-icon>
+          <span>{{ logsError }}</span>
+        </div>
+
+        <!-- Empty State -->
+        <div class="logs-empty" *ngIf="!selectedStage && !logsLoading && !logsError">
+          <lucide-icon [img]="icons['Terminal']" [size]="32" [strokeWidth]="1"></lucide-icon>
+          <span>Select a completed stage to view logs</span>
+        </div>
+
+        <!-- Logs Content -->
+        <pre class="logs-content" *ngIf="stageLogs && !logsLoading">{{ stageLogs }}</pre>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-bar">
+      <button 
+        class="btn-primary"
+        [disabled]="jobStatus.execution.state !== 'SUCCEEDED' && jobStatus.execution.state !== 'FAILED'"
+        (click)="downloadReports()">
+        <lucide-icon [img]="icons['Download']" [size]="16"></lucide-icon>
+        Download Reports
+      </button>
+      <button routerLink="/" class="btn-secondary">
+        <lucide-icon [img]="icons['ArrowLeft']" [size]="16"></lucide-icon>
+        New Job
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer-info">
+      <span>Last updated: {{ jobStatus.execution.updated_at | date:'medium' }}</span>
+    </div>
+  </div>
+</div>
