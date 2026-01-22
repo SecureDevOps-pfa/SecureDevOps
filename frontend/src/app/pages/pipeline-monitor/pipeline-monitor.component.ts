@@ -8,18 +8,19 @@ import { interval, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { RouterModule } from '@angular/router';
 import { ChangeDetectorRef } from '@angular/core';
+import { LucideAngularModule, icons } from 'lucide-angular';
 
 interface StageInfo {
   name: string;
   displayName: string;
   icon: string;
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILURE' | 'SKIPPED';
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
 }
 
 @Component({
   selector: 'app-pipeline-monitor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
   templateUrl: './pipeline-monitor.component.html',
   styleUrls: ['./pipeline-monitor.component.scss']
 })
@@ -32,15 +33,38 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
   
   private pollingSubscription?: Subscription;
 
+  // Lucide icons
+  readonly icons: { [key: string]: any } = {
+    Shield: icons.Shield,
+    Hammer: icons.Hammer,
+    TestTube: icons.TestTube,
+    Search: icons.Search,
+    Package: icons.Package,
+    Box: icons.Box,
+    Flame: icons.Flame,
+    ShieldCheck: icons.ShieldCheck,
+    Check: icons.Check,
+    X: icons.X,
+    Clock: icons.Clock,
+    Loader: icons.Loader,
+    Download: icons.Download,
+    ArrowLeft: icons.ArrowLeft,
+    TriangleAlert: icons.TriangleAlert,
+    Code: icons.Code,
+    Wrench: icons.Wrench,
+    Info: icons.Info,
+    ChevronRight: icons.ChevronRight
+  };
+
   stageMapping: { [key: string]: { displayName: string; icon: string } } = {
-    'SECRETS': { displayName: 'Secret Scan', icon: '🔐' },
-    'BUILD': { displayName: 'Build', icon: '🔨' },
-    'TEST': { displayName: 'Unit Tests', icon: '🧪' },
-    'SAST': { displayName: 'SAST', icon: '🔍' },
-    'SCA': { displayName: 'SCA', icon: '📦' },
-    'PACKAGE': { displayName: 'Package', icon: '📦' },
-    'SMOKE-TEST': { displayName: 'Smoke Tests', icon: '💨' },
-    'DAST': { displayName: 'DAST', icon: '🛡️' }
+    'SECRETS': { displayName: 'Secret Scan', icon: 'Shield' },
+    'BUILD': { displayName: 'Build', icon: 'Hammer' },
+    'TEST': { displayName: 'Unit Tests', icon: 'TestTube' },
+    'SAST': { displayName: 'Static Analysis', icon: 'Search' },
+    'SCA': { displayName: 'Dependencies', icon: 'Package' },
+    'PACKAGE': { displayName: 'Package', icon: 'Box' },
+    'SMOKE-TEST': { displayName: 'Smoke Tests', icon: 'Flame' },
+    'DAST': { displayName: 'Dynamic Analysis', icon: 'ShieldCheck' }
   };
 
   constructor(
@@ -48,6 +72,10 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
     private pipelineService: PipelineService,
     private cdr: ChangeDetectorRef
   ) {}
+
+  getStageIcon(iconName: string): any {
+    return this.icons[iconName] || this.icons['Box'];
+  }
 
   ngOnInit(): void {
     this.jobId = this.route.snapshot.paramMap.get('jobId') || '';
@@ -121,14 +149,21 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
   buildStagesList(status: JobStatus): StageInfo[] {
     const stageOrder = ['SECRETS', 'BUILD', 'TEST', 'SAST', 'SCA', 'PACKAGE', 'SMOKE-TEST', 'DAST'];
     
+    console.log('[DEBUG] Job status from backend:', status);
+    console.log('[DEBUG] Execution stages:', status.execution.stages);
+    
     return stageOrder
       .filter(stageName => status.execution.stages[stageName])
-      .map(stageName => ({
-        name: stageName,
-        displayName: this.stageMapping[stageName].displayName,
-        icon: this.stageMapping[stageName].icon,
-        status: status.execution.stages[stageName].status
-      }));
+      .map(stageName => {
+        const stageStatus = status.execution.stages[stageName].status;
+        console.log(`[DEBUG] Stage: ${stageName}, Status: ${stageStatus}`);
+        return {
+          name: stageName,
+          displayName: this.stageMapping[stageName].displayName,
+          icon: this.stageMapping[stageName].icon,
+          status: stageStatus
+        };
+      });
   }
 
   getStageClass(status: string): string {
@@ -137,7 +172,7 @@ export class PipelineMonitorComponent implements OnInit, OnDestroy {
       case 'PENDING': return `${baseClass} pending`;
       case 'RUNNING': return `${baseClass} running`;
       case 'SUCCESS': return `${baseClass} success`;
-      case 'FAILURE': return `${baseClass} failed`;
+      case 'FAILED': return `${baseClass} failed`;
       case 'SKIPPED': return `${baseClass} skipped`;
       default: return baseClass;
     }
