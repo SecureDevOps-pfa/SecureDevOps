@@ -262,15 +262,47 @@ def _run_stage(
     else :
         stage_script = _resolve_stage_script(metadata, stage)
 
+        env_exports = []
+
+        pipeline = metadata.get("pipeline", {})
+
+        # Inject custom vars if needed
+        if stage == "SECRETS" and pipeline.get("secret_scan_mode") == "custom":
+            custom = pipeline.get("secret_custom", {})
+            env_exports = [
+                f'export STAGE="{stage}"',
+                f'export INSTALL_CMD="{custom["install_cmd"]}"',
+                f'export TOOL_CMD="{custom["tool_cmd"]}"',
+                f'export LOG_EXT=".{custom.get("log_ext", "json")}"',
+            ]
+
+        if stage == "SAST" and pipeline.get("sast_mode") == "custom":
+            custom = pipeline.get("sast_custom", {})
+            env_exports = [
+                f'export STAGE="{stage}"',
+                f'export INSTALL_CMD="{custom["install_cmd"]}"',
+                f'export TOOL_CMD="{custom["tool_cmd"]}"',
+                f'export LOG_EXT=".{custom.get("log_ext", "json")}"',
+            ]
+
+        env_prefix = " && ".join(env_exports)
+
+        cmd = (
+            f'{env_prefix} && cd "$APP_DIR" && bash {stage_script}'
+            if env_exports
+            else f'cd "$APP_DIR" && bash {stage_script}'
+        )
+
         subprocess.run(
             [
                 "docker", "exec",
                 f"runner-{job_id}",
                 "bash", "-lc",
-                f'cd "$APP_DIR" && bash {stage_script}',
+                cmd,
             ],
             check=False,
         )
+
 
         # Special handling for SECRETS stage (normalize output location)
         if stage == "SECRETS":
@@ -450,10 +482,16 @@ def _docker_compose_base_cmd() -> list[str]:
         return ["docker-compose"]
 
 def _resolve_stage_script(metadata: dict, stage: str) -> str:
-    """Get the path to the script for a given stage."""
+    pipeline = metadata.get("pipeline", {})
+
+    # -------------------------------
+    # SECRETS
+    # -------------------------------
     if stage == "SECRETS":
-        pipeline = metadata.get("pipeline", {})
         mode = pipeline.get("secret_scan_mode", "dir")
+
+        if mode == "custom":
+            return "$PIPELINES_DIR/global/custom.sh"
 
         script = SECRETS_SCRIPT_BY_MODE.get(mode)
         if not script:
@@ -461,7 +499,18 @@ def _resolve_stage_script(metadata: dict, stage: str) -> str:
 
         return f"$PIPELINES_DIR/global/{script}"
 
-    # For other stages, use framework-specific scripts
+    # -------------------------------
+    # SAST
+    # -------------------------------
+    if stage == "SAST":
+        mode = pipeline.get("sast_mode", "default")
+
+        if mode == "custom":
+            return "$PIPELINES_DIR/global/custom.sh"
+
+    # -------------------------------
+    # All other stages (unchanged)
+    # -------------------------------
     pipeline_dir = _resolve_pipeline_dir(metadata)
     return f"$PIPELINES_DIR/{pipeline_dir}/{stage.lower()}.sh"
 

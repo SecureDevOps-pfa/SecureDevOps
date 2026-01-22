@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 import zipfile
 import tempfile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import model_validator
 
 app = FastAPI(
     title="Secure DevSecOps Pipeline",
@@ -39,23 +40,45 @@ class Versions(BaseModel):
     java: str | None = None
     build_tool: str | None = None
 
+class CustomToolConfig(BaseModel):
+    install_cmd: str
+    tool_cmd: str
+    log_ext: str = "json"
 
 class Pipeline(BaseModel):
     run_secret_scan: bool = False
-    secret_scan_mode: Literal["dir", "git"] = "dir"
+    secret_scan_mode: Literal["dir", "git", "custom"] = "dir"
+    secret_custom: CustomToolConfig | None = None
+
     run_build: bool = False
     run_unit_tests: bool = False
+
     run_sast: bool = False
+    sast_mode: Literal["default", "custom"] = "default"
+    sast_custom: CustomToolConfig | None = None
+
     run_sca: bool = False
     run_package: bool = False
     run_smoke: bool = False
     run_dast: bool = False
+
+    @model_validator(mode="after")
+    def validate_custom_tools(self):
+        if self.sast_mode == "custom" and not self.sast_custom:
+            raise ValueError("sast_custom must be provided when sast_mode=custom")
+
+        if self.secret_scan_mode == "custom" and not self.secret_custom:
+            raise ValueError("secret_custom must be provided when secret_scan_mode=custom")
+
+        return self
+
 
 class GitHubJobRequest(BaseModel):
     github_url: str
     stack: Stack
     versions: Versions
     pipeline: Pipeline
+
 
 
 # ---------- Endpoints ----------
@@ -231,6 +254,102 @@ def download_job_reports(job_id: str):
         zip_path,
         media_type="application/zip",
         filename=f"{job_id}-reports.zip",
+    )
+
+STAGE_LOG_FILES = {
+    "SECRETS": ["secrets-dir.json", "secrets-git.json"],
+    "BUILD": ["build.log"],
+    "TEST": ["test.log"],
+    "SAST": ["sast.json"],
+    "SCA": ["sca.json"],
+    "PACKAGE": ["package.log"],
+    "SMOKE-TEST": ["smoke-test.log"],
+    "DAST": ["dast.json"],
+}
+
+@app.get("/api/jobs/{job_id}/{stage}/logs")
+def get_stage_logs(job_id: str, stage: str):
+    stage = stage.upper()
+    job_dir = WORKSPACES_DIR / job_id
+
+    # --------------------------------------------------
+    # 1. Validate job & state
+    # --------------------------------------------------
+    if not job_dir.exists():
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    state_path = job_dir / "state.json"
+    if not state_path.exists():
+        raise HTTPException(
+            status_code=409,
+            detail="Job has not started yet"
+        )
+
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    stages = state.get("stages", {})
+
+    # --------------------------------------------------
+    # 2. Validate stage
+    # --------------------------------------------------
+    if stage not in stages:
+        raise HTTPException(status_code=404, detail="Stage not found")
+
+    stage_status = stages[stage].get("status")
+
+    if stage_status == "SKIPPED":
+        raise HTTPException(
+            status_code=404,
+            detail=f"Stage {stage} was skipped"
+        )
+
+    if stage_status in {"PENDING", "RUNNING"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Stage {stage} is not finished yet"
+        )
+
+    # --------------------------------------------------
+    # 3. Resolve log file
+    # --------------------------------------------------
+    stage_dir = job_dir / "reports" / stage.lower()
+
+    if not stage_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No reports found for stage {stage}"
+        )
+
+    pipeline = json.loads((job_dir / "metadata.json").read_text()).get("pipeline", {})
+
+    if stage == "SAST" and pipeline.get("sast_mode") == "custom":
+        ext = pipeline["sast_custom"].get("log_ext", "json")
+        expected_files = [f"SAST.{ext}"]
+
+    elif stage == "SECRETS" and pipeline.get("secret_scan_mode") == "custom":
+        ext = pipeline["secret_custom"].get("log_ext", "json")
+        expected_files = [f"SECRETS.{ext}"]
+
+    else:
+        expected_files = STAGE_LOG_FILES.get(stage)
+
+    if not expected_files:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No logs defined for stage {stage}"
+        )
+
+    for filename in expected_files:
+        file_path = stage_dir / filename
+        if file_path.exists():
+            return FileResponse(
+                file_path,
+                media_type="application/octet-stream",
+                filename=filename,
+            )
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"No log file found for stage {stage}"
     )
 
 # Swagger UI
